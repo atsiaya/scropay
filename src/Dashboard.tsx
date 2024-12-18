@@ -6,13 +6,12 @@ import "./Dashboard.css"; // Custom CSS
 import { IProvider } from "@web3auth/base";
 
 const Dashboard: React.FC = () => {
-  const { provider, logout, userInfo } = useWeb3Auth();
+  const { provider, logout } = useWeb3Auth();
   const { showWalletUI, isPluginConnected } = useWalletServicesPlugin();
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [swapInput, setSwapInput] = useState<string>("");
   const [consoleMessage, setConsoleMessage] = useState<string>("");
 
-  const uiConsole = (...args: any[]) => setConsoleMessage(JSON.stringify(args, null, 2));
 
   // Fetch wallet address on load
   useEffect(() => {
