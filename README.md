@@ -6,11 +6,7 @@
 Install & Run:
 
 ```bash
-cd w3a-example
-npm install
-npm run start
-# or
-cd w3a-example
+cd scropay
 yarn
 yarn start
 ```
