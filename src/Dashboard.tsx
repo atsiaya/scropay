@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useWeb3Auth } from "@web3auth/modal-react-hooks";
 import { useWalletServicesPlugin } from "@web3auth/wallet-services-plugin-react-hooks";
+import { useNavigate } from "react-router-dom";
 import RPC from "./web3RPC";
 import "./Dashboard.css"; // Custom CSS
 import { IProvider } from "@web3auth/base";
@@ -10,8 +11,15 @@ const Dashboard: React.FC = () => {
   const { showWalletUI, isPluginConnected } = useWalletServicesPlugin();
   const [walletAddress, setWalletAddress] = useState<string>("");
   const [swapInput, setSwapInput] = useState<string>("");
-  const [consoleMessage, setConsoleMessage] = useState<string>("");
 
+  const navigate = useNavigate();
+
+  // Redirect to Landing Page if not authenticated
+  useEffect(() => {
+    if (!provider) {
+      navigate("/");
+    }
+  }, [provider, navigate]);
 
   // Fetch wallet address on load
   useEffect(() => {
@@ -26,7 +34,7 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/"; // Redirect to Landing Page
+    navigate("/");
   };
 
   return (
@@ -88,11 +96,10 @@ const Dashboard: React.FC = () => {
         </section>
       </main>
 
-      {/* Console */}
-      <div className="console-output">
-        <h3>Console</h3>
-        <pre>{consoleMessage}</pre>
-      </div>
+      {/* Footer */}
+      <footer className="footer">
+        <p>© {new Date().getFullYear()} ScroPay. All Rights Reserved.</p>
+      </footer>
     </div>
   );
 };

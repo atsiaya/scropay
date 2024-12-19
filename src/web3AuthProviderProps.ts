@@ -11,9 +11,9 @@ const chainConfig = {
     chainNamespace: CHAIN_NAMESPACES.EIP155,
     tickerName: "Ethereum Sepolia",
     ticker: "ETH",
-    rpcTarget: "https://rpc.ankr.com/eth_sepolia",
+    rpcTarget: "https://1rpc.io/sepolia",
     blockExplorerUrl: "https://sepolia.etherscan.io",
-    logo: "https://cryptologos.cc/logos/ethereum-eth-logo.png",
+    logo: "https://coincub.com/wp-content/uploads/2022/06/blockchain.com-logo-removebg-preview.png",
 };
 
 
@@ -24,7 +24,7 @@ const privateKeyProvider = new EthereumPrivateKeyProvider({
 });
 
 const web3AuthOptions: Web3AuthOptions = {
-    clientId: "BLM9wiyd6ehT6aD1caD0pEWenIbg_r3mj3UK7AcxrfR2Ms2CjlLNum75shC_smdwf5zRhYjcULZgngvbCLxZ9Z4",
+    clientId: "BFWMC-6QA-XDjBUyYBNO-_wJGwbeRPPwuPzH6vChaMs18YcWTNbx364nNdUKbXj6L9tWu7aTxuRPdoa1LIY51ac",
     web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
     uiConfig: {
       uxMode: "redirect",
@@ -33,11 +33,11 @@ const web3AuthOptions: Web3AuthOptions = {
       theme: {
         primary: "#4eabb5",
       },
-      logoLight: "http://172.232.15.14/static/assets/img/logo_dark.png",
-      logoDark: "http://172.232.15.14/static/assets/img/logo_dark.png",
+      logoLight: "http://safepal.co.ke/wp-content/uploads/2025/05/logo-removebg.png",
+      logoDark: "http://safepal.co.ke/wp-content/uploads/2025/05/logo-removebg.png",
       defaultLanguage: "en", // en, de, ja, ko, zh, es, fr, pt, nl, tr
       mode: "auto", // whether to enable dark mode. defaultValue: auto
-      useLogoLoader: true,
+      useLogoLoader: false,
     },
     privateKeyProvider: privateKeyProvider,
     sessionTime: 86400, // 1 day
@@ -51,8 +51,8 @@ const web3AuthOptions: Web3AuthOptions = {
     adapterSettings: {
       uxMode: "redirect", // "redirect" | "popup"
       whiteLabel: {
-        logoLight: "http://172.232.15.14/static/assets/img/logo_dark.png",
-        logoDark: "http://172.232.15.14/static/assets/img/logo_light.png",
+        logoLight: "http://safepal.co.ke/wp-content/uploads/2025/05/logo-removebg.png",
+        logoDark: "http://safepal.co.ke/wp-content/uploads/2025/05/logo-removebg.png",
         defaultLanguage: "en", // en, de, ja, ko, zh, es, fr, pt, nl, tr
         mode: "dark", // whether to enable dark, light or auto mode. defaultValue: auto [ system theme]
       },
@@ -83,7 +83,7 @@ const web3AuthOptions: Web3AuthOptions = {
 
   const walletServicesPlugin = new WalletServicesPlugin({
     wsEmbedOpts: {},
-    walletInitOptions: { whiteLabel: { showWidgetButton: true } },
+    walletInitOptions: { whiteLabel: { showWidgetButton: false } },
   });
 
 

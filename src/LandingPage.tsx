@@ -51,8 +51,8 @@ const LandingPage: React.FC = () => {
       <main className="landing-content">
         <h1>Welcome to ScroPay</h1>
         <p>
-          ScroPay is a cutting-edge Web3 platform enabling decentralized
-          payments and secure connections with blockchain technology. Connect your wallet and get started!
+          ScroPay is a cutting-edge Web3 platform on testnet demonstrating decentralized
+          and secure asseet tokenization in blockchain technology. Connect your wallet and get started!
         </p>
         <button className="login-button" onClick={handleLogin}>
           Connect Wallet
