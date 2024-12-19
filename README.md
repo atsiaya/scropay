@@ -1,9 +1,3 @@
-### One-Click Deploy to Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FWeb3Auth%2Fweb3auth-pnp-examples%2Ftree%2Fmain%2Fweb-modal-sdk%2Fblockchain-connection-examples%2Fevm-modal-example&project-name=w3a-evm-modal&repository-name=w3a-evm-modal)
-
-
-
 Install & Run:
 
 ```bash
@@ -13,8 +7,9 @@ yarn start
 ```
 
 
-Abstract
-scropay is a decentralized rental platform revolutionizing access to real-world assets (e.g., vehicles, homes, tools) and digital assets (e.g., gaming skins, virtual properties). Utilizing blockchain technology, smart contracts, and reputation-based "trust tokens," scropay enables secure, trustless, and collateral-backed rentals without intermediaries. By tokenizing rental periods as NFTs, owners can monetize their assets while renters gain access with reduced risk. Decentralized arbitration ensures fair dispute resolution, bridging traditional rental markets and decentralized finance (DeFi).
+Abstract.
+
+Scropay is a decentralized rental platform revolutionizing access to real-world assets (e.g., vehicles, homes, tools) and digital assets (e.g., gaming skins, virtual properties). Utilizing blockchain technology, smart contracts, and reputation-based "trust tokens," scropay enables secure, trustless, and collateral-backed rentals without intermediaries. By tokenizing rental periods as NFTs, owners can monetize their assets while renters gain access with reduced risk. Decentralized arbitration ensures fair dispute resolution, bridging traditional rental markets and decentralized finance (DeFi).
 
 1. Introduction
 In traditional rental markets, trust issues, intermediaries, and opaque processes create inefficiencies for asset owners and renters. High fees, delayed payments, and the risk of damage or fraud make peer-to-peer rentals difficult to scale.
