@@ -15,15 +15,11 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   // Redirect to Landing Page if not authenticated
-  useEffect(() => {
-    if (!provider) {
-<<<<<<< HEAD
-      navigate("/");
-=======
-      navigate("/"); // Redirects to the landing page if no provider
->>>>>>> addd19bae8f404b177bbe871373c7b14fb8f1957
-    }
-  }, [provider, navigate]);
+useEffect(() => {
+  if (!provider) {
+    navigate("/"); // Redirects to the landing page if no provider
+  }
+}, [provider, navigate]);
 
   // Fetch wallet address on load
   useEffect(() => {
@@ -38,11 +34,9 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-<<<<<<< HEAD
-    navigate("/");
-=======
+
     navigate("/"); // Redirect to Landing Page
->>>>>>> addd19bae8f404b177bbe871373c7b14fb8f1957
+
   };
 
   return (
