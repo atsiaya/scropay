@@ -10,7 +10,7 @@ const Dashboard: React.FC = () => {
   const { provider, logout } = useWeb3Auth();
   const { showWalletUI, isPluginConnected } = useWalletServicesPlugin();
   const [walletAddress, setWalletAddress] = useState<string>("");
-  const [swapInput, setSwapInput] = useState<string>("");
+  
 
   const navigate = useNavigate();
 
@@ -41,69 +41,84 @@ useEffect(() => {
 
   return (
     <div className="dashboard-container">
-      {/* Header */}
-      <header className="app-bar">
-        <div className="app-title">ScroPay</div>
-        <button onClick={handleLogout} className="logout-button">
-          Logout
+  {/* Header */}
+  <header className="app-bar header-responsive">
+    <div className="app-title">ScroPay</div>
+
+    {walletAddress && (
+      <div className="wallet-controls">
+        <button
+          onClick={() => showWalletUI()}
+          disabled={!isPluginConnected}
+          className="wallet-ui-button"
+        >
+          Wallet
         </button>
-      </header>
+      </div>
+    )}
 
-      {/* Main Content */}
-      <main className="dashboard-content">
-        {/* Profile Section */}
-        <section className="profile-section">
-          <h2>Wallet Address</h2>
-          <p className="wallet-address">{walletAddress || "Loading..."}</p>
-          <button
-            onClick={() => showWalletUI()}
-            disabled={!isPluginConnected}
-            className="wallet-ui-button"
-          >
-            View Wallet
-          </button>
-        </section>
+    <button onClick={handleLogout} className="logout-button" aria-label="Logout">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="logout-icon"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        width="20"
+        height="20"
+      >
+        <path d="M16 13v-2H7V8l-5 4 5 4v-3h9zM20 3H12a1 1 0 0 0-1 1v4h2V5h6v14h-6v-3h-2v4a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1z"/>
+      </svg>
+    </button>
+  </header>
 
-        {/* Swap Section */}
-        <section className="swap-section">
-          <h2>Swap Cryptocurrencies</h2>
-          <div className="swap-form">
-            <input
-              type="text"
-              placeholder="Amount to Swap"
-              value={swapInput}
-              onChange={(e) => setSwapInput(e.target.value)}
-              className="swap-input"
-            />
-            <select className="crypto-select">
-              <option value="ETH">ETH</option>
-              <option value="MATIC">MATIC</option>
-              <option value="DAI">DAI</option>
-            </select>
-            <span className="arrow">⇄</span>
-            <select className="crypto-select">
-              <option value="MATIC">MATIC</option>
-              <option value="ETH">ETH</option>
-              <option value="USDC">USDC</option>
-            </select>
-          </div>
-          <button className="swap-button">Swap</button>
-        </section>
-
-        {/* Send/Receive Section */}
-        <section className="send-receive-section">
-          <h2>Send / Receive Assets</h2>
-          <button className="send-button">Send Assets</button>
-          <button className="receive-button">Receive Assets</button>
-        </section>
-      </main>
-
-      {/* Footer */}
-      <footer className="footer">
-        <p>© {new Date().getFullYear()} ScroPay. All Rights Reserved.</p>
-      </footer>
+  {/* Main Content */}
+  <main className="dashboard-content">{/* content goes here */}
+  <div className="dashboard-content">
+  {/* Header */}
+  <header className="dashboard-header">
+    <div className="logo-section">
+      {/* <img
+        src="/public/logo192.png"
+        alt="logo"
+        className="logo-image"
+      /> */}
+      <span className="logo-text">NFTS</span>
     </div>
+
+    {/* Search Form */}
+    <form className="search-form">
+      <label htmlFor="search" className="visually-hidden">Search</label>
+      <input
+        type="search"
+        id="search"
+        className="search-input"
+        placeholder="Search tokenized asset"
+      />
+      <span className="search-placeholder">Search</span>
+    </form>
+  </header>
+
+  {/* Category Navigation (placeholder for scrollable nav bar) */}
+  <nav className="category-nav">
+    {/* Add your nav items here */}
+    <span className="category-item">All</span>
+    <span className="category-item">Real Estate</span>
+    <span className="category-item">Insurance policy</span>
+    <span className="category-item">Renewable energy</span>
+    <span className="category-item">zkVM</span>
+  </nav>
+</div>
+
+  </main>
+
+  {/* Footer */}
+  <footer className="footer">
+    <p>© {new Date().getFullYear()} ScroPay. All Rights Reserved.</p>
+  </footer>
+</div>
+
   );
+  
 };
 
 export default Dashboard;
