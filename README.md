@@ -9,7 +9,7 @@ connection**. It's meant as a starting point for a real integration, not a
 production payments product on its own — see the checklist below for what
 that would need.
 
-## Running it
+## Running 
 
 ```bash
 npm install
