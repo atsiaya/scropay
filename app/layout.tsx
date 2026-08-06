@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Web3Provider } from "./web3-provider";
 
 export const metadata: Metadata = {
   title: "Ramp — Buy & sell USDT with M-Pesa",
@@ -12,7 +13,9 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        <Web3Provider>{children}</Web3Provider>
+      </body>
     </html>
   );
 }

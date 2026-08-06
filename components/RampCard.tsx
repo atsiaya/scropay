@@ -5,10 +5,13 @@ import { useRouter } from "next/navigation";
 import { RampDirection, RateQuote } from "@/lib/types";
 import { fiatToAsset, assetToFiat } from "@/lib/rates";
 import { formatFiat, formatAsset } from "@/lib/format";
+import {
+  MIN_BUY_FIAT_KES,
+  MAX_BUY_FIAT_KES,
+  MIN_SELL_ASSET_USDT,
+  MAX_SELL_ASSET_USDT,
+} from "@/lib/limits";
 import LedgerStrip from "./LedgerStrip";
-
-const MIN_FIAT = 100;
-const MAX_FIAT = 150000;
 
 export default function RampCard() {
   const router = useRouter();
@@ -46,22 +49,40 @@ export default function RampCard() {
 
   useEffect(() => {
     if (!activeRate) return;
+    // Deliberate cross-field sync, not a render-derivable value: when the
+    // rate ticks, whichever side the user *isn't* actively typing in needs
+    // to be recomputed from it.
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (editingSide === "fiat") {
       setAssetAmount(fiatToAsset(fiatAmount, activeRate));
     } else {
       setFiatAmount(assetToFiat(assetAmount, activeRate));
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRate]);
 
   const payLabel = direction === "buy" ? "You pay" : "You send";
   const receiveLabel = direction === "buy" ? "You receive" : "You get";
 
+  // "Over the limit" is distinct from "invalid" — over-limit routes to KYC
+  // instead of just blocking the button.
+  const overLimit = useMemo(() => {
+    if (direction === "buy") return fiatAmount > MAX_BUY_FIAT_KES;
+    return assetAmount > MAX_SELL_ASSET_USDT;
+  }, [direction, fiatAmount, assetAmount]);
+
   const validationError = useMemo(() => {
-    if (fiatAmount < MIN_FIAT) return `Minimum is KES ${formatFiat(MIN_FIAT)}`;
-    if (fiatAmount > MAX_FIAT) return `Maximum is KES ${formatFiat(MAX_FIAT)}`;
+    if (overLimit) return null; // shown via the KYC CTA instead
+    if (direction === "buy") {
+      if (fiatAmount < MIN_BUY_FIAT_KES)
+        return `Minimum is KES ${formatFiat(MIN_BUY_FIAT_KES)}`;
+    } else {
+      if (assetAmount < MIN_SELL_ASSET_USDT)
+        return `Minimum is ${MIN_SELL_ASSET_USDT} USDT`;
+    }
     return null;
-  }, [fiatAmount]);
+  }, [direction, fiatAmount, assetAmount, overLimit]);
 
   function handleFiatChange(value: string) {
     const n = Number(value.replace(/[^0-9.]/g, ""));
@@ -78,14 +99,25 @@ export default function RampCard() {
   }
 
   function handleContinue() {
-    if (validationError || !quote) return;
+    if (!quote) return;
     const params = new URLSearchParams({
       direction,
       fiat: String(fiatAmount),
       asset: String(assetAmount),
       network: quote.network,
     });
-    router.push(`/connect?${params.toString()}`);
+
+    if (overLimit) {
+      router.push(`/kyc?${params.toString()}`);
+      return;
+    }
+    if (validationError) return;
+
+    router.push(
+      direction === "buy"
+        ? `/connect?${params.toString()}`
+        : `/sell/payout?${params.toString()}`
+    );
   }
 
   return (
@@ -221,11 +253,17 @@ export default function RampCard() {
           disabled={!quote || !!validationError}
           className="focus-ring mt-5 w-full rounded-xl bg-[var(--color-ink)] py-3.5 text-sm font-semibold text-[var(--color-paper)] transition-opacity disabled:opacity-40"
         >
-          {direction === "buy" ? "Next: connect wallet" : "Next: choose payout"}
+          {overLimit
+            ? "Complete registration & KYC →"
+            : direction === "buy"
+              ? "Next: connect wallet"
+              : "Next: enter M-Pesa number"}
         </button>
 
         <p className="mt-3 text-center text-xs text-[var(--color-ink)]/40">
-          Rates refresh every 20s · KYC required over KES 30,000
+          {direction === "buy"
+            ? `Rates refresh every 20s · No KYC up to KES ${formatFiat(MAX_BUY_FIAT_KES)}`
+            : `Rates refresh every 20s · No KYC up to ${MAX_SELL_ASSET_USDT} USDT`}
         </p>
       </div>
     </div>

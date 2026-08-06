@@ -43,3 +43,23 @@ export interface WalletOption {
   name: string;
   description: string;
 }
+
+export type OrderStatus =
+  | "pending_deposit"
+  | "awaiting_verification"
+  | "confirmed"
+  | "expired";
+
+export interface SellOrder {
+  id: string;
+  direction: "sell";
+  asset: string;
+  network: Network;
+  assetAmount: number;
+  fiatAmount: number;
+  mpesaNumber: string;
+  depositAddress: string;
+  status: OrderStatus;
+  createdAt: number;
+  expiresAt: number;
+}
