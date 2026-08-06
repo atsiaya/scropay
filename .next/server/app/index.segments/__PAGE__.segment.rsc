@@ -1,6 +1,0 @@
-1:"$Sreact.fragment"
-2:I[53628,["/_next/static/chunks/3rade5qtke9ft.js","/_next/static/chunks/2jt6_qhnwp2mn.js"],"default"]
-3:I[81289,["/_next/static/chunks/3rade5qtke9ft.js"],"OutletBoundary"]
-4:"$Sreact.suspense"
-0:{"rsc":["$","$1","c",{"children":[["$","main",null,{"className":"flex min-h-screen flex-col items-center bg-[var(--color-paper)] px-4 py-10","children":[["$","div",null,{"className":"mb-8 w-full max-w-md","children":[["$","div",null,{"className":"flex items-center gap-2 text-sm font-medium text-[var(--color-moss-deep)]","children":[["$","span",null,{"className":"inline-block h-2 w-2 rounded-full bg-[var(--color-ochre)]"}],"Ramp"]}],["$","h1",null,{"className":"font-display mt-3 text-3xl font-medium leading-tight text-[var(--color-ink)]","children":["Shillings in,",["$","br",null,{}],"USDT out. No exchange required."]}],["$","p",null,{"className":"mt-2 text-sm text-[var(--color-ink)]/60","children":"Pay with M-Pesa, receive USDT directly in your wallet — or cash out the other way."}]]}],["$","$L2",null,{}]]}],[["$","script","script-0",{"src":"/_next/static/chunks/2jt6_qhnwp2mn.js","async":true}]],["$","$L3",null,{"children":["$","$4",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"K_ILjjbV7Wx8jdLWG_6fA"}
-5:null

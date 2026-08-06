@@ -1,3 +1,0 @@
-module.exports=[35421,a=>{"use strict";var b=a.i(80884);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{className:"antialiased",children:a})})},"metadata",0,{title:"Ramp — Buy & sell USDT with M-Pesa",description:"A Kenyan on/off-ramp: move between M-Pesa shillings and USDT in seconds."}])},51664,a=>{a.n(a.i(35421))}];
-
-//# sourceMappingURL=Desktop_scropay_app_layout_tsx_0-s_1vc._.js.map
