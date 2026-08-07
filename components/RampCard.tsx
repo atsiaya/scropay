@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { RampDirection, RateQuote } from "@/lib/types";
+import { RampDirection, RateQuote, Network } from "@/lib/types";
 import { fiatToAsset, assetToFiat } from "@/lib/rates";
 import { formatFiat, formatAsset } from "@/lib/format";
 import {
@@ -13,9 +13,20 @@ import {
 } from "@/lib/limits";
 import LedgerStrip from "./LedgerStrip";
 
+// Tron is deliberately excluded — it's non-EVM and isn't wired into the
+// AppKit/wagmi wallet-connect setup (see README "Adding Tron support"),
+// so offering it here would let someone pick a network the buy flow
+// can't actually complete.
+const NETWORK_OPTIONS: { value: Network; label: string }[] = [
+  { value: "CELO", label: "Celo" },
+  { value: "POLYGON", label: "Polygon" },
+  { value: "BASE", label: "Base" },
+];
+
 export default function RampCard() {
   const router = useRouter();
   const [direction, setDirection] = useState<RampDirection>("buy");
+  const [network, setNetwork] = useState<Network>("CELO");
   const [quote, setQuote] = useState<RateQuote | null>(null);
   const [fiatAmount, setFiatAmount] = useState(2500);
   const [editingSide, setEditingSide] = useState<"fiat" | "asset">("fiat");
@@ -26,7 +37,7 @@ export default function RampCard() {
     let mounted = true;
     async function poll() {
       try {
-        const res = await fetch("/api/rate?network=CELO", { cache: "no-store" });
+        const res = await fetch(`/api/rate?network=${network}`, { cache: "no-store" });
         const data: RateQuote = await res.json();
         if (mounted) setQuote(data);
       } catch {
@@ -39,7 +50,7 @@ export default function RampCard() {
       mounted = false;
       clearInterval(id);
     };
-  }, []);
+  }, [network]);
 
   const activeRate = quote
     ? direction === "buy"
@@ -104,7 +115,7 @@ export default function RampCard() {
       direction,
       fiat: String(fiatAmount),
       asset: String(assetAmount),
-      network: quote.network,
+      network,
     });
 
     if (overLimit) {
@@ -217,7 +228,18 @@ export default function RampCard() {
               />
             </div>
             <span className="rounded-full border border-[var(--color-line)] bg-[var(--color-paper)] px-2.5 py-1 text-xs font-medium text-[var(--color-ink)]/70">
-              Celo network
+              <select
+                value={network}
+                onChange={(e) => setNetwork(e.target.value as Network)}
+                className="focus-ring bg-transparent outline-none"
+                aria-label="Network"
+              >
+                {NETWORK_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label} network
+                  </option>
+                ))}
+              </select>
             </span>
           </div>
         </label>
