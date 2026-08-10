@@ -8,6 +8,7 @@ export interface KycRequest {
   sessionId: string | null;
   /** the government ID number — our key for "has this person verified before" */
   vendorData: string;
+  email: string;
   direction: RampDirection;
   fiat: number;
   asset: number;
@@ -37,6 +38,7 @@ export function isVendorVerified(vendorData: string): boolean {
 export function createPendingRequest(input: {
   requestId: string;
   vendorData: string;
+  email: string;
   direction: RampDirection;
   fiat: number;
   asset: number;
