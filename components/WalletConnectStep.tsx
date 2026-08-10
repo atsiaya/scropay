@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAppKit } from "@reown/appkit/react";
 import { useAccount, useChainId, useDisconnect, useSwitchChain } from "wagmi";
 import { celo, polygon, base } from "@reown/appkit/networks";
@@ -28,11 +29,16 @@ function truncate(addr: string): string {
 
 export default function WalletConnectStep({
   network,
+  fiat,
+  asset,
   onBack,
 }: {
   network: Network;
+  fiat: number;
+  asset: number;
   onBack: () => void;
 }) {
+  const router = useRouter();
   const target = CHAIN_BY_NETWORK[network];
 
   const { open } = useAppKit();
@@ -97,6 +103,15 @@ export default function WalletConnectStep({
 
         <button
           disabled={wrongNetwork}
+          onClick={() => {
+            const q = new URLSearchParams({
+              network,
+              fiat: String(fiat),
+              asset: String(asset),
+              wallet: connectedAddress,
+            });
+            router.push(`/buy/pay?${q.toString()}`);
+          }}
           className="focus-ring mt-6 w-full rounded-xl bg-[var(--color-ink)] py-3.5 text-sm font-semibold text-[var(--color-paper)] disabled:opacity-40"
         >
           Confirm and pay with M-Pesa
