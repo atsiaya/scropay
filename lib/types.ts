@@ -63,3 +63,24 @@ export interface SellOrder {
   createdAt: number;
   expiresAt: number;
 }
+
+export type BuyOrderStatus = "pending_payment" | "paid" | "failed" | "expired";
+
+export interface BuyOrder {
+  id: string;
+  direction: "buy";
+  asset: string;
+  network: Network;
+  assetAmount: number;
+  fiatAmount: number;
+  mpesaNumber: string;
+  email: string | null;
+  walletAddress: string;
+  status: BuyOrderStatus;
+  /** the Kopokopo incoming_payment resource URL, returned in the Location
+   *  header when we initiate the STK push — this is what we poll for the
+   *  authoritative status, never the webhook body alone. */
+  kopokopoResourceUrl: string | null;
+  createdAt: number;
+  expiresAt: number;
+}
