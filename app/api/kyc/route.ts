@@ -19,15 +19,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { fullName, idNumber, direction, fiat, asset, network } = body as {
+  const { fullName, idNumber, email, direction, fiat, asset, network } = body as {
     fullName?: string;
     idNumber?: string;
+    email?: string;
     direction?: RampDirection;
     fiat?: number;
     asset?: number;
     network?: Network;
   };
 
+  if (!email?.trim() || !email.includes("@")) {
+    return NextResponse.json({ error: "A valid email is required" }, { status: 400 });
+  }
   if (!fullName?.trim() || !idNumber?.trim()) {
     return NextResponse.json(
       { error: "Full name and ID number are required" },
@@ -51,7 +55,15 @@ export async function POST(req: NextRequest) {
   // its session_id inside the create-session response, too late to bake
   // into the very callback URL we send in that same request.
   const requestId = randomUUID();
-  createPendingRequest({ requestId, vendorData, direction, fiat, asset, network });
+  createPendingRequest({
+    requestId,
+    vendorData,
+    email: email.trim(),
+    direction,
+    fiat,
+    asset,
+    network,
+  });
 
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
