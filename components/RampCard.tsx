@@ -256,12 +256,7 @@ export default function RampCard() {
               {quote ? `KES ${quote.marketRate.toFixed(2)}` : "—"}
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span>Our rate ({(quote?.marginBps ?? 0) / 100}% spread)</span>
-            <span className="font-mono">
-              {quote ? `KES ${activeRate?.toFixed(2)}` : "—"}
-            </span>
-          </div>
+       
         </div>
 
         {(validationError || error) && (
