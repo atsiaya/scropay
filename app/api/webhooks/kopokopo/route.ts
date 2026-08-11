@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
-import { getPendingBuyOrders, setBuyOrderStatus, getBuyOrder } from "@/lib/buy-orders";
+import {
+  getPendingBuyOrders,
+  setBuyOrderStatus,
+  getBuyOrder,
+  notifyBuyOrderPaid,
+} from "@/lib/buy-orders";
 import { getStkPushStatus } from "@/lib/kopokopo";
-import { logTransaction } from "@/lib/firebase";
-import { sendOwnerNotification } from "@/lib/email";
-import { formatAsset, formatFiat } from "@/lib/format";
 
 /**
  * Kopokopo's webhook payload shape is one of the least consistently
@@ -42,16 +44,7 @@ export async function POST() {
       // order is a signal for you to fulfil it, not proof it's done.
       if (finalStatus === "paid") {
         const updated = getBuyOrder(order.id);
-        if (updated) {
-          await logTransaction(updated);
-          await sendOwnerNotification(
-            `New buy order paid — KES ${formatFiat(updated.fiatAmount)}`,
-            `<p>Order <code>${updated.id}</code> paid.</p>
-             <p>${formatFiat(updated.fiatAmount)} KES → ${formatAsset(updated.assetAmount)} ${updated.asset} on ${updated.network}</p>
-             <p>Wallet: <code>${updated.walletAddress}</code></p>
-             <p>M-Pesa: ${updated.mpesaNumber}${updated.email ? ` · ${updated.email}` : ""}</p>`
-          );
-        }
+        if (updated) await notifyBuyOrderPaid(updated);
       }
     })
   );
