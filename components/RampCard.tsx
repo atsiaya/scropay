@@ -28,7 +28,7 @@ export default function RampCard() {
   const [direction, setDirection] = useState<RampDirection>("buy");
   const [network, setNetwork] = useState<Network>("CELO");
   const [quote, setQuote] = useState<RateQuote | null>(null);
-  const [fiatAmount, setFiatAmount] = useState(2500);
+  const [fiatAmount, setFiatAmount] = useState(500);
   const [editingSide, setEditingSide] = useState<"fiat" | "asset">("fiat");
   const [assetAmount, setAssetAmount] = useState(0);
   const [error, setError] = useState<string | null>(null);
