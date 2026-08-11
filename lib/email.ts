@@ -33,3 +33,27 @@ export async function sendOwnerNotification(subject: string, html: string): Prom
     console.error("Resend send threw:", err);
   }
 }
+
+/**
+ * A plain, consistently-formatted details table for order-notification
+ * emails. Values render in monospace inside a bordered cell so they're
+ * easy to triple-click-select and copy out of an email client — order
+ * ids, addresses, and phone numbers are exactly the kind of value you'll
+ * want to paste into a block explorer, Daraja, or a support ticket.
+ */
+export function renderDetailsTable(rows: [label: string, value: string][]): string {
+  const cells = rows
+    .map(
+      ([label, value]) => `
+        <tr>
+          <td style="padding:6px 12px;color:#5b5548;font-size:13px;white-space:nowrap;vertical-align:top;">${label}</td>
+          <td style="padding:6px 12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;border:1px solid #e2ded0;border-radius:6px;">${value}</td>
+        </tr>`
+    )
+    .join("");
+
+  return `
+    <table cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:0 4px;font-family:ui-sans-serif,system-ui,sans-serif;">
+      ${cells}
+    </table>`;
+}
