@@ -4,14 +4,12 @@ import {
   attachKopokopoResource,
   getBuyOrder,
   setBuyOrderStatus,
+  notifyBuyOrderPaid,
 } from "@/lib/buy-orders";
 import { initiateStkPush, getStkPushStatus } from "@/lib/kopokopo";
 import { normalizeMsisdn } from "@/lib/phone";
 import { Network } from "@/lib/types";
 import { MIN_BUY_FIAT_KES } from "@/lib/limits";
-import { logTransaction } from "@/lib/firebase";
-import { sendOwnerNotification } from "@/lib/email";
-import { formatAsset, formatFiat } from "@/lib/format";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -98,14 +96,7 @@ export async function GET(req: NextRequest) {
       setBuyOrderStatus(orderId, finalStatus);
       if (finalStatus === "paid") {
         const updated = getBuyOrder(orderId)!;
-        await logTransaction(updated);
-        await sendOwnerNotification(
-          `New buy order paid — KES ${formatFiat(updated.fiatAmount)}`,
-          `<p>Order <code>${updated.id}</code> paid.</p>
-           <p>${formatFiat(updated.fiatAmount)} KES → ${formatAsset(updated.assetAmount)} ${updated.asset} on ${updated.network}</p>
-           <p>Wallet: <code>${updated.walletAddress}</code></p>
-           <p>M-Pesa: ${updated.mpesaNumber}${updated.email ? ` · ${updated.email}` : ""}</p>`
-        );
+        await notifyBuyOrderPaid(updated);
       }
     }
   }
