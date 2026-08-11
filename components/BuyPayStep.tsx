@@ -70,14 +70,28 @@ export default function BuyPayStep() {
   useEffect(() => {
     if (stage !== "waiting" || !orderId) return;
     let cancelled = false;
+    let consecutiveErrors = 0;
+    const MAX_CONSECUTIVE_ERRORS = 5; // ~15s of transient failures before giving up
 
     async function poll() {
       try {
         const res = await fetch(`/api/buy/stk-push?id=${orderId}`, { cache: "no-store" });
         if (!res.ok) {
-          if (!cancelled) setStage("failed");
+          // A single bad response (a rate-limited token refresh, a cold
+          // serverless instance, a network blip) must not look like a
+          // failed payment — only genuinely repeated failures should.
+          consecutiveErrors += 1;
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            if (!cancelled) setStage("failed");
+            return;
+          }
+          pollCount.current += 1;
+          if (pollCount.current < MAX_POLLS) setTimeout(poll, POLL_INTERVAL_MS);
+          else if (!cancelled) setStage("failed");
           return;
         }
+        consecutiveErrors = 0;
+
         const order: BuyOrder = await res.json();
         if (cancelled) return;
 
@@ -97,7 +111,17 @@ export default function BuyPayStep() {
           setStage("failed");
         }
       } catch {
-        if (!cancelled) setStage("failed");
+        // Same reasoning as the !res.ok branch — a thrown fetch (e.g. a
+        // brief network drop) is transient, not a payment failure.
+        consecutiveErrors += 1;
+        pollCount.current += 1;
+        if (!cancelled) {
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS || pollCount.current >= MAX_POLLS) {
+            setStage("failed");
+          } else {
+            setTimeout(poll, POLL_INTERVAL_MS);
+          }
+        }
       }
     }
 
