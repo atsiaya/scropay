@@ -7,7 +7,7 @@ import { fetchMarketRate, getFallbackRate } from "./priceFeed";
  * margin, in line with what P2P/ramp apps typically charge. Tune this per
  * corridor/volume; it's the one number that turns "quote" into "profit."
  */
-const MARGIN_BPS = 60;
+const MARGIN_BPS = 50;
 
 export async function getQuote(network: Network = "CELO"): Promise<RateQuote> {
   const now = Date.now();
