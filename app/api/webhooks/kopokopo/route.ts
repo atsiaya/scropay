@@ -29,22 +29,28 @@ export async function POST() {
 
   await Promise.all(
     pending.map(async (order) => {
-      if (!order.kopokopoResourceUrl) return;
-      const status = await getStkPushStatus(order.kopokopoResourceUrl);
-      if (status === "pending") return;
+      try {
+        if (!order.kopokopoResourceUrl) return;
+        const status = await getStkPushStatus(order.kopokopoResourceUrl);
+        if (status === "pending") return;
 
-      const finalStatus = status === "success" ? "paid" : "failed";
-      setBuyOrderStatus(order.id, finalStatus);
+        const finalStatus = status === "success" ? "paid" : "failed";
+        setBuyOrderStatus(order.id, finalStatus);
 
-      // "paid" here means the KES leg is confirmed — it does NOT mean
-      // USDT has actually moved. Dispatching the on-chain transfer to
-      // order.walletAddress is a separate, unbuilt step that needs real
-      // custody/signing infrastructure (see README's custody notes on
-      // the sell side for the same gap in reverse). For now, a "paid"
-      // order is a signal for you to fulfil it, not proof it's done.
-      if (finalStatus === "paid") {
-        const updated = getBuyOrder(order.id);
-        if (updated) await notifyBuyOrderPaid(updated);
+        // "paid" here means the KES leg is confirmed — it does NOT mean
+        // USDT has actually moved. Dispatching the on-chain transfer to
+        // order.walletAddress is a separate, unbuilt step that needs real
+        // custody/signing infrastructure (see README's custody notes on
+        // the sell side for the same gap in reverse). For now, a "paid"
+        // order is a signal for you to fulfil it, not proof it's done.
+        if (finalStatus === "paid") {
+          const updated = getBuyOrder(order.id);
+          if (updated) await notifyBuyOrderPaid(updated);
+        }
+      } catch (err) {
+        // One order's processing failing must never take down the whole
+        // webhook response (or the other orders in this same batch).
+        console.error(`Webhook processing failed for order ${order.id}:`, err);
       }
     })
   );
