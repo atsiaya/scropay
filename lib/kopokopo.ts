@@ -119,22 +119,47 @@ export type KopokopoPaymentStatus = "pending" | "success" | "failed";
  * "pending" rather than ever guessing "success" from an unrecognized
  * shape — verify against a real sandbox response and adjust the parsing
  * here if needed.
+ *
+ * Deliberately swallows every error into "pending" rather than throwing:
+ * this gets called on every poll (every few seconds while a payment is
+ * in flight), so a single transient failure — a rate-limited token
+ * refresh, a network blip — must never look like "the payment failed."
+ * Only an explicit "Failed" status from Kopokopo itself should ever
+ * produce a real failure. Errors are logged so they're visible in your
+ * deployment's function logs even though the caller never sees them.
  */
 export async function getStkPushStatus(
   resourceUrl: string
 ): Promise<KopokopoPaymentStatus> {
-  const accessToken = await getAccessToken();
-  const res = await fetch(resourceUrl, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-    cache: "no-store",
-  });
+  try {
+    const accessToken = await getAccessToken();
+    const res = await fetch(resourceUrl, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+      cache: "no-store",
+    });
 
-  if (!res.ok) return "pending"; // transient error — caller will poll again
+    if (!res.ok) {
+      console.error(
+        `Kopokopo status check non-OK (${res.status}) for ${resourceUrl}:`,
+        await res.text().catch(() => "<no body>")
+      );
+      return "pending"; // transient error — caller will poll again
+    }
 
-  const data = await res.json().catch(() => null);
-  const status: string | undefined = data?.data?.attributes?.status;
+    const data = await res.json().catch(() => null);
+    const status: string | undefined = data?.data?.attributes?.status;
 
-  if (status === "Success") return "success";
-  if (status === "Failed") return "failed";
-  return "pending"; // "Pending", unrecognized shape, or missing field
+    if (status === "Success") return "success";
+    if (status === "Failed") return "failed";
+    if (!status) {
+      console.error(
+        `Kopokopo status check got an unrecognized response shape for ${resourceUrl}:`,
+        JSON.stringify(data)
+      );
+    }
+    return "pending"; // "Pending", unrecognized shape, or missing field
+  } catch (err) {
+    console.error(`Kopokopo status check threw for ${resourceUrl}:`, err);
+    return "pending";
+  }
 }
