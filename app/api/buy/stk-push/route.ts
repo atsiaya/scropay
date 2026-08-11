@@ -89,15 +89,25 @@ export async function GET(req: NextRequest) {
   // production; the frontend polling this endpoint is what actually
   // guarantees the "waiting for confirmation" screen resolves, even in a
   // dev setup with no public webhook URL configured at all.
+  //
+  // Wrapped defensively: getStkPushStatus itself never throws (see its
+  // comments), but this belt-and-suspenders catch means a bug anywhere
+  // in this block — including in notifyBuyOrderPaid's side effects —
+  // degrades to "still pending" for the client, never a 500 that the
+  // frontend would otherwise treat as a failed payment.
   if (order.status === "pending_payment" && order.kopokopoResourceUrl) {
-    const status = await getStkPushStatus(order.kopokopoResourceUrl);
-    if (status !== "pending") {
-      const finalStatus = status === "success" ? "paid" : "failed";
-      setBuyOrderStatus(orderId, finalStatus);
-      if (finalStatus === "paid") {
-        const updated = getBuyOrder(orderId)!;
-        await notifyBuyOrderPaid(updated);
+    try {
+      const status = await getStkPushStatus(order.kopokopoResourceUrl);
+      if (status !== "pending") {
+        const finalStatus = status === "success" ? "paid" : "failed";
+        setBuyOrderStatus(orderId, finalStatus);
+        if (finalStatus === "paid") {
+          const updated = getBuyOrder(orderId)!;
+          await notifyBuyOrderPaid(updated);
+        }
       }
+    } catch (err) {
+      console.error(`Status-check block failed for order ${orderId}:`, err);
     }
   }
 
