@@ -9,5 +9,5 @@
 export const MIN_BUY_FIAT_KES = 100;
 export const MAX_BUY_FIAT_KES = 500;
 
-export const MIN_SELL_ASSET_USDT = 1;
-export const MAX_SELL_ASSET_USDT = 150;
+export const MIN_SELL_ASSET_USDT = 2;
+export const MAX_SELL_ASSET_USDT = 200;
