@@ -15,6 +15,7 @@ export default function SellPayoutStep() {
   const network = (params.get("network") as Network) || "CELO";
 
   const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,6 +37,7 @@ export default function SellPayoutStep() {
           assetAmount: asset,
           fiatAmount: fiat,
           mpesaNumber: phone,
+          email: email || undefined,
         }),
       });
       const data = await res.json();
@@ -80,6 +82,19 @@ export default function SellPayoutStep() {
               placeholder="07XX XXX XXX"
               inputMode="tel"
               className="focus-ring w-full rounded-xl border border-[var(--color-line)] bg-white px-4 py-3 font-mono text-lg"
+            />
+          </label>
+
+          <label className="mt-3 block">
+            <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-[var(--color-ink)]/50">
+              Email (optional, for your receipt)
+            </span>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="focus-ring w-full rounded-xl border border-[var(--color-line)] bg-white px-4 py-3 text-sm"
             />
           </label>
 
