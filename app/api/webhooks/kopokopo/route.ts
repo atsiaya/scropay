@@ -3,10 +3,11 @@ import {
   getPendingBuyOrders,
   setBuyOrderStatus,
   getBuyOrder,
-  notifyBuyOrderPaid,
-  notifyBuyOrderFailed,
+  finalizeBuyOrder,
 } from "@/lib/buy-orders";
 import { getStkPushStatus } from "@/lib/kopokopo";
+
+export const dynamic = "force-dynamic";
 
 /**
  * Kopokopo's webhook payload shape is one of the least consistently
@@ -44,13 +45,8 @@ export async function POST() {
         // custody/signing infrastructure (see README's custody notes on
         // the sell side for the same gap in reverse). For now, a "paid"
         // order is a signal for you to fulfil it, not proof it's done.
-        if (finalStatus === "paid") {
-          const updated = getBuyOrder(order.id);
-          if (updated) await notifyBuyOrderPaid(updated);
-        } else {
-          const updated = getBuyOrder(order.id);
-          if (updated) await notifyBuyOrderFailed(updated);
-        }
+        const updated = getBuyOrder(order.id);
+        if (updated) await finalizeBuyOrder(updated);
       } catch (err) {
         // One order's processing failing must never take down the whole
         // webhook response (or the other orders in this same batch).
