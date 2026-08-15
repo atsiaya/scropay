@@ -5,6 +5,7 @@ import {
   getBuyOrder,
   setBuyOrderStatus,
   notifyBuyOrderPaid,
+  notifyBuyOrderFailed,
 } from "@/lib/buy-orders";
 import { initiateStkPush, getStkPushStatus } from "@/lib/kopokopo";
 import { normalizeMsisdn } from "@/lib/phone";
@@ -97,13 +98,15 @@ export async function GET(req: NextRequest) {
   // frontend would otherwise treat as a failed payment.
   if (order.status === "pending_payment" && order.kopokopoResourceUrl) {
     try {
-      const status = await getStkPushStatus(order.kopokopoResourceUrl);
+      const { status, reason } = await getStkPushStatus(order.kopokopoResourceUrl);
       if (status !== "pending") {
         const finalStatus = status === "success" ? "paid" : "failed";
-        setBuyOrderStatus(orderId, finalStatus);
+        setBuyOrderStatus(orderId, finalStatus, reason);
         if (finalStatus === "paid") {
           const updated = getBuyOrder(orderId)!;
           await notifyBuyOrderPaid(updated);
+        } else {
+          await notifyBuyOrderFailed(getBuyOrder(orderId)!);
         }
       }
     } catch (err) {
