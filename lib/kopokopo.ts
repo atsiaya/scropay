@@ -111,6 +111,18 @@ export async function initiateStkPush(input: {
 
 export type KopokopoPaymentStatus = "pending" | "success" | "failed";
 
+export interface KopokopoStatusResult {
+  status: KopokopoPaymentStatus;
+  /** Kopokopo's own decline reason, when we can find one — e.g.
+   *  "insufficient funds", "request cancelled by user", a DS/Safaricom
+   *  timeout, etc. Not guaranteed: their exact field for this isn't
+   *  consistently documented, so this checks a few plausible paths and
+   *  is null if none match — always paired with a full JSON log below,
+   *  so a real failure is diagnosable from your function logs even when
+   *  this field comes back empty. */
+  reason: string | null;
+}
+
 /**
  * Re-fetches the payment resource directly — this, not the webhook body,
  * is the source of truth. Field names below (data.attributes.status) are
@@ -130,7 +142,7 @@ export type KopokopoPaymentStatus = "pending" | "success" | "failed";
  */
 export async function getStkPushStatus(
   resourceUrl: string
-): Promise<KopokopoPaymentStatus> {
+): Promise<KopokopoStatusResult> {
   try {
     const accessToken = await getAccessToken();
     const res = await fetch(resourceUrl, {
@@ -143,23 +155,38 @@ export async function getStkPushStatus(
         `Kopokopo status check non-OK (${res.status}) for ${resourceUrl}:`,
         await res.text().catch(() => "<no body>")
       );
-      return "pending"; // transient error — caller will poll again
+      return { status: "pending", reason: null }; // transient error — caller will poll again
     }
 
     const data = await res.json().catch(() => null);
     const status: string | undefined = data?.data?.attributes?.status;
 
-    if (status === "Success") return "success";
-    if (status === "Failed") return "failed";
+    if (status === "Success") return { status: "success", reason: null };
+
+    if (status === "Failed") {
+      // Log the full body every time — this is the one thing that
+      // actually explains a real decline (wrong PIN, insufficient
+      // funds, a Safaricom-side timeout, till not STK-enabled, etc.),
+      // and there's no point guessing the field name blind when you can
+      // just read it here once and know for certain.
+      console.error(`Kopokopo reported Failed for ${resourceUrl}:`, JSON.stringify(data));
+      const reason =
+        data?.data?.attributes?.event?.errors ??
+        data?.data?.attributes?.status_reason ??
+        data?.data?.attributes?.event?.resource?.status_reason ??
+        null;
+      return { status: "failed", reason: typeof reason === "string" ? reason : null };
+    }
+
     if (!status) {
       console.error(
         `Kopokopo status check got an unrecognized response shape for ${resourceUrl}:`,
         JSON.stringify(data)
       );
     }
-    return "pending"; // "Pending", unrecognized shape, or missing field
+    return { status: "pending", reason: null }; // "Pending", unrecognized shape, or missing field
   } catch (err) {
     console.error(`Kopokopo status check threw for ${resourceUrl}:`, err);
-    return "pending";
+    return { status: "pending", reason: null };
   }
 }

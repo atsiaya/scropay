@@ -30,6 +30,27 @@ export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
 }
 
 /**
+ * A failed STK push is worth knowing about too — repeated failures on
+ * the same till often mean an account-level problem (till not STK-
+ * enabled, expired agreement) rather than one customer mistyping a PIN.
+ * Not logged to Firestore — there's no completed transaction to record,
+ * just a notification so a pattern of failures doesn't go unnoticed.
+ */
+export async function notifyBuyOrderFailed(order: BuyOrder): Promise<void> {
+  await sendOwnerNotification(
+    `Buy order failed — KES ${formatFiat(order.fiatAmount)}`,
+    renderDetailsTable([
+      ["Order ID", order.id],
+      ["Status", "Failed"],
+      ["Reason (from Kopokopo)", order.failureReason ?? "not provided — check the Kopokopo dashboard"],
+      ["Fiat amount", `KES ${formatFiat(order.fiatAmount)}`],
+      ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
+      ["Created", new Date(order.createdAt).toLocaleString()],
+    ])
+  );
+}
+
+/**
  * Same caveat as lib/orders.ts: a Map on a module-level variable works
  * for local dev and a single warm serverless instance, but not reliably
  * across Vercel's instances. Move to Redis/KV or Postgres before this
@@ -65,6 +86,7 @@ export function createBuyOrder(input: {
     walletAddress: input.walletAddress,
     status: "pending_payment",
     kopokopoResourceUrl: null,
+    failureReason: null,
     createdAt: now,
     expiresAt: now + ORDER_TTL_MS,
   };
@@ -86,10 +108,15 @@ export function attachKopokopoResource(id: string, resourceUrl: string): void {
   if (order) order.kopokopoResourceUrl = resourceUrl;
 }
 
-export function setBuyOrderStatus(id: string, status: BuyOrder["status"]): BuyOrder | undefined {
+export function setBuyOrderStatus(
+  id: string,
+  status: BuyOrder["status"],
+  failureReason?: string | null
+): BuyOrder | undefined {
   const order = buyOrders.get(id);
   if (!order) return undefined;
   order.status = status;
+  if (failureReason !== undefined) order.failureReason = failureReason;
   return order;
 }
 
