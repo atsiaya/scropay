@@ -1,25 +1,45 @@
 import { BuyOrder, Network } from "./types";
 import { logTransaction } from "./firebase";
-import { sendOwnerNotification, renderDetailsTable } from "./email";
+import { sendOwnerNotification, sendUserEmail, renderDetailsTable } from "./email";
 import { formatAsset, formatFiat } from "./format";
 import { formatMsisdn } from "./phone";
 
 /**
- * Called from both the webhook and the GET status-poll endpoint — both
- * paths flip a buy order to "paid" and need the same follow-up (log +
- * notify), so this is the one place that follow-up is written. See the
- * webhook's header comment for the known double-fire race between the
- * two callers; harmless beyond a possible duplicate email for now.
+ * The single place a buy order's outcome gets finalized — called from
+ * both the webhook and the GET status-poll endpoint once either sees a
+ * non-pending status. Runs the same three steps regardless of whether
+ * the order ended up paid or failed:
+ *
+ *   1. Log the full order to Firestore — every outcome, not just paid
+ *      ones, so failed attempts are just as queryable for support/
+ *      pattern-spotting as completed ones.
+ *   2. Notify you (always — a failed order is as worth knowing about as
+ *      a paid one, especially if failures start clustering).
+ *   3. Email the customer, if they gave one — different copy for paid
+ *      vs failed, since "your money is safe, nothing happened" and
+ *      "your USDT is on its way" are different messages to send.
+ *
+ * See the webhook's header comment for the known double-fire race
+ * between its caller and the GET endpoint's; harmless beyond a possible
+ * duplicate Firestore write / duplicate emails for now.
  */
-export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
+export async function finalizeBuyOrder(order: BuyOrder): Promise<void> {
   await logTransaction(order);
+
+  const paid = order.status === "paid";
+
   await sendOwnerNotification(
-    `Buy order paid — KES ${formatFiat(order.fiatAmount)} → ${formatAsset(order.assetAmount)} USDT`,
+    paid
+      ? `Buy order paid — KES ${formatFiat(order.fiatAmount)} → ${formatAsset(order.assetAmount)} USDT`
+      : `Buy order failed — KES ${formatFiat(order.fiatAmount)}`,
     renderDetailsTable([
       ["Order ID", order.id],
-      ["Status", "Paid — USDT not yet dispatched"],
-      ["Fiat paid", `KES ${formatFiat(order.fiatAmount)}`],
-      ["Asset to send", `${formatAsset(order.assetAmount)} ${order.asset}`],
+      ["Status", paid ? "Paid — USDT not yet dispatched" : "Failed"],
+      ...(paid
+        ? []
+        : ([["Reason (from Kopokopo)", order.failureReason ?? "not provided — check the Kopokopo dashboard"]] as [string, string][])),
+      ["Fiat amount", `KES ${formatFiat(order.fiatAmount)}`],
+      ["Asset amount", `${formatAsset(order.assetAmount)} ${order.asset}`],
       ["Network", order.network],
       ["Destination wallet", order.walletAddress],
       ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
@@ -27,27 +47,29 @@ export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
       ["Created", new Date(order.createdAt).toLocaleString()],
     ])
   );
-}
 
-/**
- * A failed STK push is worth knowing about too — repeated failures on
- * the same till often mean an account-level problem (till not STK-
- * enabled, expired agreement) rather than one customer mistyping a PIN.
- * Not logged to Firestore — there's no completed transaction to record,
- * just a notification so a pattern of failures doesn't go unnoticed.
- */
-export async function notifyBuyOrderFailed(order: BuyOrder): Promise<void> {
-  await sendOwnerNotification(
-    `Buy order failed — KES ${formatFiat(order.fiatAmount)}`,
-    renderDetailsTable([
-      ["Order ID", order.id],
-      ["Status", "Failed"],
-      ["Reason (from Kopokopo)", order.failureReason ?? "not provided — check the Kopokopo dashboard"],
-      ["Fiat amount", `KES ${formatFiat(order.fiatAmount)}`],
-      ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
-      ["Created", new Date(order.createdAt).toLocaleString()],
-    ])
-  );
+  if (order.email) {
+    await sendUserEmail(
+      order.email,
+      paid ? "Your USDT purchase is confirmed" : "We couldn't complete your USDT purchase",
+      paid
+        ? `<p>Thanks — we've received your payment.</p>
+           ${renderDetailsTable([
+             ["Order ID", order.id],
+             ["Paid", `KES ${formatFiat(order.fiatAmount)}`],
+             ["Receiving", `${formatAsset(order.assetAmount)} ${order.asset} (${order.network})`],
+             ["Wallet", order.walletAddress],
+           ])}
+           <p>Your USDT is on its way to that wallet.</p>`
+        : `<p>Your M-Pesa payment didn't go through, so no USDT was sent — no charge was made.</p>
+           ${renderDetailsTable([
+             ["Order ID", order.id],
+             ["Amount", `KES ${formatFiat(order.fiatAmount)}`],
+             ...(order.failureReason ? ([["Reason", order.failureReason]] as [string, string][]) : []),
+           ])}
+           <p>Feel free to try again.</p>`
+    );
+  }
 }
 
 /**
