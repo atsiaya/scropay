@@ -4,13 +4,17 @@ import {
   attachKopokopoResource,
   getBuyOrder,
   setBuyOrderStatus,
-  notifyBuyOrderPaid,
-  notifyBuyOrderFailed,
+  finalizeBuyOrder,
 } from "@/lib/buy-orders";
 import { initiateStkPush, getStkPushStatus } from "@/lib/kopokopo";
 import { normalizeMsisdn } from "@/lib/phone";
 import { Network } from "@/lib/types";
 import { MIN_BUY_FIAT_KES } from "@/lib/limits";
+
+// This route triggers a real M-Pesa charge and polls a live payment
+// status — it must never be served from any cache (Vercel's Edge/CDN,
+// or Next's own route cache). Explicit, not just relying on defaults.
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
@@ -93,7 +97,7 @@ export async function GET(req: NextRequest) {
   //
   // Wrapped defensively: getStkPushStatus itself never throws (see its
   // comments), but this belt-and-suspenders catch means a bug anywhere
-  // in this block — including in notifyBuyOrderPaid's side effects —
+  // in this block — including in finalizeBuyOrder's side effects —
   // degrades to "still pending" for the client, never a 500 that the
   // frontend would otherwise treat as a failed payment.
   if (order.status === "pending_payment" && order.kopokopoResourceUrl) {
@@ -102,12 +106,7 @@ export async function GET(req: NextRequest) {
       if (status !== "pending") {
         const finalStatus = status === "success" ? "paid" : "failed";
         setBuyOrderStatus(orderId, finalStatus, reason);
-        if (finalStatus === "paid") {
-          const updated = getBuyOrder(orderId)!;
-          await notifyBuyOrderPaid(updated);
-        } else {
-          await notifyBuyOrderFailed(getBuyOrder(orderId)!);
-        }
+        await finalizeBuyOrder(getBuyOrder(orderId)!);
       }
     } catch (err) {
       console.error(`Status-check block failed for order ${orderId}:`, err);
