@@ -4,6 +4,7 @@ import {
   setBuyOrderStatus,
   getBuyOrder,
   notifyBuyOrderPaid,
+  notifyBuyOrderFailed,
 } from "@/lib/buy-orders";
 import { getStkPushStatus } from "@/lib/kopokopo";
 
@@ -31,11 +32,11 @@ export async function POST() {
     pending.map(async (order) => {
       try {
         if (!order.kopokopoResourceUrl) return;
-        const status = await getStkPushStatus(order.kopokopoResourceUrl);
+        const { status, reason } = await getStkPushStatus(order.kopokopoResourceUrl);
         if (status === "pending") return;
 
         const finalStatus = status === "success" ? "paid" : "failed";
-        setBuyOrderStatus(order.id, finalStatus);
+        setBuyOrderStatus(order.id, finalStatus, reason);
 
         // "paid" here means the KES leg is confirmed — it does NOT mean
         // USDT has actually moved. Dispatching the on-chain transfer to
@@ -46,6 +47,9 @@ export async function POST() {
         if (finalStatus === "paid") {
           const updated = getBuyOrder(order.id);
           if (updated) await notifyBuyOrderPaid(updated);
+        } else {
+          const updated = getBuyOrder(order.id);
+          if (updated) await notifyBuyOrderFailed(updated);
         }
       } catch (err) {
         // One order's processing failing must never take down the whole
