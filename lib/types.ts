@@ -58,6 +58,7 @@ export interface SellOrder {
   assetAmount: number;
   fiatAmount: number;
   mpesaNumber: string;
+  email: string | null;
   depositAddress: string;
   status: OrderStatus;
   createdAt: number;

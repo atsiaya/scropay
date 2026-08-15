@@ -32,6 +32,7 @@ async function getAccessToken(): Promise<string> {
 
   const res = await fetch(`${BASE_URL}/oauth/token`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
@@ -77,6 +78,7 @@ export async function initiateStkPush(input: {
   // account, check your Kopokopo dashboard's API version notice first.
   const res = await fetch(`${BASE_URL}/api/v2/incoming_payments`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -98,7 +100,14 @@ export async function initiateStkPush(input: {
   });
 
   if (res.status !== 201) {
-    throw new Error(`Kopokopo stk_push_failed (${res.status}): ${await res.text()}`);
+    const body = await res.text();
+    console.error(`Kopokopo STK push failed (${res.status}) for ${input.phoneNumber}:`, body);
+    // A bad/expired cached token would show up here as a 401 — drop the
+    // cache so the *next* attempt (a user hitting "Try again") is
+    // guaranteed to fetch a fresh one rather than retrying with the same
+    // token that just failed.
+    if (res.status === 401) cachedToken = null;
+    throw new Error(`Kopokopo stk_push_failed (${res.status}): ${body}`);
   }
 
   const resourceUrl = res.headers.get("location");
