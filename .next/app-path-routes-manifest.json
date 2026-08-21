@@ -1,0 +1,18 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/buy/stk-push/route": "/api/buy/stk-push",
+  "/api/kyc/route": "/api/kyc",
+  "/api/orders/[id]/confirm/route": "/api/orders/[id]/confirm",
+  "/api/orders/route": "/api/orders",
+  "/api/rate/route": "/api/rate",
+  "/api/webhooks/didit/route": "/api/webhooks/didit",
+  "/api/webhooks/kopokopo/route": "/api/webhooks/kopokopo",
+  "/buy/pay/page": "/buy/pay",
+  "/connect/page": "/connect",
+  "/kyc/callback/page": "/kyc/callback",
+  "/kyc/page": "/kyc",
+  "/page": "/",
+  "/sell/deposit/page": "/sell/deposit",
+  "/sell/payout/page": "/sell/payout"
+}

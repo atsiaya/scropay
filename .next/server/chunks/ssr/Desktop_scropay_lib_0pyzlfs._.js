@@ -1,0 +1,3 @@
+module.exports=[727758,a=>{"use strict";a.s(["formatAsset",0,function(a){return 0===a?"0":a.toLocaleString("en-KE",{maximumFractionDigits:6})},"formatFiat",0,function(a){return a.toLocaleString("en-KE",{maximumFractionDigits:0})},"timeLeft",0,function(a,b){return Math.max(0,Math.round(b-(Date.now()-a)/1e3))}])},502443,a=>{"use strict";a.s(["formatMsisdn",0,function(a){return/^254\d{9}$/.test(a)?`+254 ${a.slice(3,6)} ${a.slice(6,9)} ${a.slice(9)}`:a},"normalizeMsisdn",0,function(a){let b=a.replace(/[^0-9]/g,"");return/^0[17]\d{8}$/.test(b)?"254"+b.slice(1):/^254[17]\d{8}$/.test(b)?b:null}])}];
+
+//# sourceMappingURL=Desktop_scropay_lib_0pyzlfs._.js.map

@@ -1,0 +1,13 @@
+var R=require("../../../chunks/ssr/[turbopack]_runtime.js")("server/app/sell/deposit/page.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0pbf47p._.js")
+R.c("server/chunks/ssr/116m_next_dist_esm_build_templates_app-page_0m3btl1.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1vygtd8._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__0t77e_a._.js")
+R.c("server/chunks/ssr/Desktop_scropay_app_1r0btbn._.js")
+R.c("server/chunks/ssr/116m_next_dist_client_components_0m-jaw3._.js")
+R.c("server/chunks/ssr/116m_next_dist_client_components_builtin_forbidden_0n4sy9f.js")
+R.c("server/chunks/ssr/116m_next_dist_client_components_builtin_unauthorized_1hd6dgw.js")
+R.c("server/chunks/ssr/116m_next_dist_client_components_builtin_global-error_20hso_e.js")
+R.c("server/chunks/ssr/Desktop_scropay__next-internal_server_app_sell_deposit_page_actions_1nqkz71.js")
+R.m(754511)
+module.exports=R.m(754511).exports

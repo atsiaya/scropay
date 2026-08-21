@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/sell/layout,_N_T_/sell/payout/layout,_N_T_/sell/payout/page,_N_T_/sell/payout"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/sell/payout/__PAGE__",
+    "/sell/payout",
+    "/sell",
+    "/_index",
+    "/_head"
+  ]
+}
