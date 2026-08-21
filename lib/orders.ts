@@ -1,7 +1,7 @@
 import { SellOrder, Network } from "./types";
 import { getTreasuryAddress } from "./treasury";
 import { logTransaction } from "./firebase";
-import { sendOwnerNotification, sendUserEmail, renderDetailsTable } from "./email";
+import { sendOwnerNotification, sendCustomerNotification, renderDetailsTable } from "./email";
 import { formatAsset, formatFiat } from "./format";
 import { formatMsisdn } from "./phone";
 
@@ -100,7 +100,7 @@ export async function finalizeSellOrderClaim(order: SellOrder): Promise<void> {
   );
 
   if (order.email) {
-    await sendUserEmail(
+    await sendCustomerNotification(
       order.email,
       "We're verifying your USDT sale",
       `<p>We've received your confirmation that you sent USDT — we're checking for it now.</p>
