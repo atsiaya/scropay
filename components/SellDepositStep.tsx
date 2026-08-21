@@ -50,6 +50,12 @@ export default function SellDepositStep() {
       .catch(() => setQrDataUrl(null));
   }, [order]);
 
+  useEffect(() => {
+    if (order?.status !== "awaiting_verification") return;
+    const timeout = setTimeout(() => router.push("/"), 10_000);
+    return () => clearTimeout(timeout);
+  }, [order?.status, router]);
+
   async function handleAlreadyPaid() {
     if (!order) return;
     setConfirming(true);
@@ -127,6 +133,9 @@ export default function SellDepositStep() {
           </p>
           <p className="mt-4 font-mono text-xs text-[var(--color-ink)]/40">
             Reference: {order.id}
+          </p>
+          <p className="mt-2 text-xs text-[var(--color-ink)]/40">
+            Returning home in 10 seconds.
           </p>
         </div>
       </Shell>
