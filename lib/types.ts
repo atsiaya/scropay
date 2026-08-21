@@ -58,6 +58,7 @@ export interface SellOrder {
   assetAmount: number;
   fiatAmount: number;
   mpesaNumber: string;
+  email: string | null;
   depositAddress: string;
   status: OrderStatus;
   createdAt: number;
@@ -85,6 +86,10 @@ export interface BuyOrder {
    *  header when we initiate the STK push — this is what we poll for the
    *  authoritative status, never the webhook body alone. */
   kopokopoResourceUrl: string | null;
+  /** Kopokopo's decline reason, when a status check found one — see
+   *  lib/kopokopo.ts's getStkPushStatus for how (and how unreliably)
+   *  this gets extracted. */
+  failureReason: string | null;
   createdAt: number;
   expiresAt: number;
 }

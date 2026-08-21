@@ -10,12 +10,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { asset, network, assetAmount, fiatAmount, mpesaNumber } = body as {
+  const { asset, network, assetAmount, fiatAmount, mpesaNumber, email } = body as {
     asset?: string;
     network?: Network;
     assetAmount?: number;
     fiatAmount?: number;
     mpesaNumber?: string;
+    email?: string;
   };
 
   // Re-check everything server-side — the limits and phone format in the
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     assetAmount,
     fiatAmount,
     mpesaNumber: msisdn,
+    email: email?.trim() || null,
   });
 
   return NextResponse.json(order, { status: 201 });

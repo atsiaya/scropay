@@ -12,6 +12,8 @@ import { MIN_BUY_FIAT_KES } from "@/lib/limits";
 import { normalizeMsisdn } from "@/lib/phone";
 import { Network } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

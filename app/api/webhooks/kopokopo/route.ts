@@ -7,6 +7,8 @@ import {
 } from "@/lib/buy-orders";
 import { getStkPushPayment } from "@/lib/kopokopo";
 
+export const dynamic = "force-dynamic";
+
 /** KopoKopo webhooks trigger a fresh authenticated check of each pending order. */
 export async function POST() {
   await Promise.all(

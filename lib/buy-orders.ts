@@ -79,6 +79,7 @@ export function createBuyOrder(input: {
     walletAddress: input.walletAddress,
     status: "pending_payment",
     kopokopoResourceUrl: null,
+    failureReason: null,
     createdAt: now,
     expiresAt: now + ORDER_TTL_MS,
   };
@@ -98,10 +99,15 @@ export function attachKopokopoResource(id: string, resourceUrl: string): void {
   if (order) order.kopokopoResourceUrl = resourceUrl;
 }
 
-export function setBuyOrderStatus(id: string, status: BuyOrder["status"]): BuyOrder | undefined {
+export function setBuyOrderStatus(
+  id: string,
+  status: BuyOrder["status"],
+  failureReason?: string | null
+): BuyOrder | undefined {
   const order = buyOrders.get(id);
   if (!order) return undefined;
   order.status = status;
+  if (failureReason !== undefined) order.failureReason = failureReason;
   return order;
 }
 
