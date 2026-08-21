@@ -1,43 +1,55 @@
 import { BuyOrder, Network } from "./types";
 import { logTransaction } from "./firebase";
-import { sendOwnerNotification, renderDetailsTable } from "./email";
-import { formatAsset, formatFiat } from "./format";
+import { renderDetailsTable, sendAdminNotification, sendCustomerNotification } from "./email";
+import { formatAmountToTwoDecimals } from "./format";
 import { formatMsisdn } from "./phone";
 
-/**
- * Called from both the webhook and the GET status-poll endpoint — both
- * paths flip a buy order to "paid" and need the same follow-up (log +
- * notify), so this is the one place that follow-up is written. See the
- * webhook's header comment for the known double-fire race between the
- * two callers; harmless beyond a possible duplicate email for now.
- */
+/** Sends the customer receipt and an actionable admin transfer request. */
 export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
   await logTransaction(order);
-  await sendOwnerNotification(
-    `Buy order paid — KES ${formatFiat(order.fiatAmount)} → ${formatAsset(order.assetAmount)} USDT`,
+
+  const amount = `${formatAmountToTwoDecimals(order.assetAmount)} ${order.asset}`;
+  const fiatAmount = `KES ${formatAmountToTwoDecimals(order.fiatAmount)}`;
+  const mpesaReference = order.mpesaReference ?? "Not supplied by KopoKopo";
+  const payerName = order.payerName ?? "Not supplied by KopoKopo";
+
+  const adminEmail = sendAdminNotification(
+    `Transfer request - ${amount} to ${order.walletAddress}`,
     renderDetailsTable([
       ["Order ID", order.id],
-      ["Status", "Paid — USDT not yet dispatched"],
-      ["Fiat paid", `KES ${formatFiat(order.fiatAmount)}`],
-      ["Asset to send", `${formatAsset(order.assetAmount)} ${order.asset}`],
+      ["Status", "M-Pesa payment confirmed - transfer requested"],
+      ["Transfer to address", order.walletAddress],
+      ["Amount to transfer", amount],
+      ["Fiat paid", fiatAmount],
+      ["M-Pesa reference", mpesaReference],
+      ["Payer name", payerName],
       ["Network", order.network],
-      ["Destination wallet", order.walletAddress],
       ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
-      ["Email", order.email ?? "—"],
       ["Created", new Date(order.createdAt).toLocaleString()],
     ])
   );
+
+  const customerEmail = order.email
+    ? sendCustomerNotification(
+        order.email,
+        `Payment successful - ${amount}`,
+        renderDetailsTable([
+          ["Status", "Payment received successfully"],
+          ["Amount paid", fiatAmount],
+          ["USDT to receive", amount],
+          ["Destination wallet", order.walletAddress],
+          ["Network", order.network],
+          ["M-Pesa reference", mpesaReference],
+          ["Order ID", order.id],
+        ])
+      )
+    : Promise.resolve();
+
+  await Promise.all([adminEmail, customerEmail]);
 }
 
-/**
- * Same caveat as lib/orders.ts: a Map on a module-level variable works
- * for local dev and a single warm serverless instance, but not reliably
- * across Vercel's instances. Move to Redis/KV or Postgres before this
- * handles real money — keep the same four functions as the surface area.
- */
 const buyOrders = new Map<string, BuyOrder>();
-
-const ORDER_TTL_MS = 15 * 60 * 1000; // 15 minutes to complete the M-Pesa payment
+const ORDER_TTL_MS = 15 * 60 * 1000;
 
 function generateOrderId(): string {
   return `buy_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -62,6 +74,8 @@ export function createBuyOrder(input: {
     fiatAmount: input.fiatAmount,
     mpesaNumber: input.mpesaNumber,
     email: input.email,
+    mpesaReference: null,
+    payerName: null,
     walletAddress: input.walletAddress,
     status: "pending_payment",
     kopokopoResourceUrl: null,
@@ -75,9 +89,7 @@ export function createBuyOrder(input: {
 export function getBuyOrder(id: string): BuyOrder | undefined {
   const order = buyOrders.get(id);
   if (!order) return undefined;
-  if (order.status === "pending_payment" && Date.now() > order.expiresAt) {
-    order.status = "expired";
-  }
+  if (order.status === "pending_payment" && Date.now() > order.expiresAt) order.status = "expired";
   return order;
 }
 
@@ -93,9 +105,19 @@ export function setBuyOrderStatus(id: string, status: BuyOrder["status"]): BuyOr
   return order;
 }
 
-/** All orders still worth polling — used by the webhook handler, which
- *  treats the webhook ping as a trigger to re-check these rather than
- *  trusting the webhook body (see lib/kopokopo.ts's header comment). */
+/** Marks an order paid exactly once, preventing duplicate webhook/poll emails. */
+export function markBuyOrderPaid(
+  id: string,
+  payment: { mpesaReference: string | null; payerName: string | null }
+): BuyOrder | undefined {
+  const order = buyOrders.get(id);
+  if (!order || order.status !== "pending_payment") return undefined;
+  order.status = "paid";
+  order.mpesaReference = payment.mpesaReference;
+  order.payerName = payment.payerName;
+  return order;
+}
+
 export function getPendingBuyOrders(): BuyOrder[] {
-  return Array.from(buyOrders.values()).filter((o) => o.status === "pending_payment");
+  return Array.from(buyOrders.values()).filter((order) => order.status === "pending_payment");
 }

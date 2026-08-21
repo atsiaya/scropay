@@ -2,6 +2,14 @@ export function formatFiat(n: number): string {
   return n.toLocaleString("en-KE", { maximumFractionDigits: 0 });
 }
 
+/** Use for settlement instructions, where rounding must be explicit. */
+export function formatAmountToTwoDecimals(n: number): string {
+  return n.toLocaleString("en-KE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 export function formatAsset(n: number): string {
   if (n === 0) return "0";
   return n.toLocaleString("en-KE", { maximumFractionDigits: 6 });

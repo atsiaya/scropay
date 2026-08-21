@@ -37,6 +37,10 @@ export default function BuyPayStep() {
       setError("Enter a valid M-Pesa number, e.g. 0712345678");
       return;
     }
+    if (!email.trim() || !email.includes("@")) {
+      setError("Enter a valid email so we can send your payment receipt.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -49,7 +53,7 @@ export default function BuyPayStep() {
           assetAmount: asset,
           fiatAmount: fiat,
           mpesaNumber: phone,
-          email: email || undefined,
+          email: email.trim(),
           walletAddress: wallet,
         }),
       });
@@ -165,7 +169,7 @@ export default function BuyPayStep() {
 
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-[var(--color-ink)]/50">
-                  Email (optional, for your receipt)
+                  Email (for your payment receipt)
                 </span>
                 <input
                   type="email"

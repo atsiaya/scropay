@@ -75,6 +75,10 @@ export interface BuyOrder {
   fiatAmount: number;
   mpesaNumber: string;
   email: string | null;
+  /** M-Pesa receipt/reference returned by KopoKopo after a successful payment. */
+  mpesaReference: string | null;
+  /** Payer name supplied by KopoKopo when it is available. */
+  payerName: string | null;
   walletAddress: string;
   status: BuyOrderStatus;
   /** the Kopokopo incoming_payment resource URL, returned in the Location
