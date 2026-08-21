@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BuyOrder, Network } from "@/lib/types";
 import { normalizeMsisdn } from "@/lib/phone";
@@ -9,7 +9,6 @@ import { formatFiat, formatAsset } from "@/lib/format";
 type Stage = "confirm" | "waiting" | "paid" | "failed";
 
 const POLL_INTERVAL_MS = 3000;
-const MAX_POLLS = 40; // ~2 minutes — STK prompts time out around then anyway
 
 function truncate(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -29,7 +28,6 @@ export default function BuyPayStep() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
-  const pollCount = useRef(0);
 
   async function handlePay() {
     const msisdn = normalizeMsisdn(phone);
@@ -74,27 +72,14 @@ export default function BuyPayStep() {
   useEffect(() => {
     if (stage !== "waiting" || !orderId) return;
     let cancelled = false;
-    let consecutiveErrors = 0;
-    const MAX_CONSECUTIVE_ERRORS = 5; // ~15s of transient failures before giving up
-
     async function poll() {
       try {
         const res = await fetch(`/api/buy/stk-push?id=${orderId}`, { cache: "no-store" });
         if (!res.ok) {
-          // A single bad response (a rate-limited token refresh, a cold
-          // serverless instance, a network blip) must not look like a
-          // failed payment — only genuinely repeated failures should.
-          consecutiveErrors += 1;
-          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
-            if (!cancelled) setStage("failed");
-            return;
-          }
-          pollCount.current += 1;
-          if (pollCount.current < MAX_POLLS) setTimeout(poll, POLL_INTERVAL_MS);
-          else if (!cancelled) setStage("failed");
+          // A request error is not proof that the M-Pesa charge failed.
+          if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
           return;
         }
-        consecutiveErrors = 0;
 
         const order: BuyOrder = await res.json();
         if (cancelled) return;
@@ -108,24 +93,10 @@ export default function BuyPayStep() {
           return;
         }
 
-        pollCount.current += 1;
-        if (pollCount.current < MAX_POLLS) {
-          setTimeout(poll, POLL_INTERVAL_MS);
-        } else {
-          setStage("failed");
-        }
+        if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
       } catch {
-        // Same reasoning as the !res.ok branch — a thrown fetch (e.g. a
-        // brief network drop) is transient, not a payment failure.
-        consecutiveErrors += 1;
-        pollCount.current += 1;
-        if (!cancelled) {
-          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS || pollCount.current >= MAX_POLLS) {
-            setStage("failed");
-          } else {
-            setTimeout(poll, POLL_INTERVAL_MS);
-          }
-        }
+        // Keep checking until KopoKopo itself returns a terminal status.
+        if (!cancelled) setTimeout(poll, POLL_INTERVAL_MS);
       }
     }
 
@@ -253,7 +224,6 @@ export default function BuyPayStep() {
                 onClick={() => {
                   setStage("confirm");
                   setOrderId(null);
-                  pollCount.current = 0;
                 }}
                 className="focus-ring mt-4 w-full rounded-xl bg-[var(--color-ink)] py-3.5 text-sm font-semibold text-[var(--color-paper)]"
               >

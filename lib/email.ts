@@ -4,10 +4,10 @@
  */
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.NOTIFY_EMAIL_FROM;
+  const from = process.env.EMAIL_FROM;
 
   if (!apiKey || !from) {
-    console.error("Email not sent: RESEND_API_KEY / NOTIFY_EMAIL_FROM missing.");
+    console.error("Email not sent: RESEND_API_KEY / EMAIL_FROM missing.");
     return;
   }
 
@@ -31,10 +31,9 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
 
 /** Sends an operational alert to the administrator configured in the environment. */
 export async function sendAdminNotification(subject: string, html: string): Promise<void> {
-  // ADMIN_EMAIL is preferred. NOTIFY_EMAIL_TO keeps existing deployments working.
-  const to = process.env.ADMIN_EMAIL || process.env.NOTIFY_EMAIL_TO;
+  const to = process.env.ADMIN_EMAIL;
   if (!to) {
-    console.error("Admin email not sent: ADMIN_EMAIL / NOTIFY_EMAIL_TO missing.");
+    console.error("Admin email not sent: ADMIN_EMAIL missing.");
     return;
   }
   await sendEmail(to, subject, html);

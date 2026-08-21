@@ -113,7 +113,7 @@ export async function getStkPushPayment(resourceUrl: string): Promise<StkPushPay
 
     const data = await res.json().catch(() => null);
     const attributes = data?.data?.attributes;
-    const status: string | undefined = attributes?.status;
+    const status = stringValue(attributes?.status)?.toLowerCase();
     const mpesaReference = firstString(
       attributes?.mpesa_reference,
       attributes?.mpesa_receipt_number,
@@ -126,8 +126,13 @@ export async function getStkPushPayment(resourceUrl: string): Promise<StkPushPay
       fullName(attributes?.subscriber?.first_name, attributes?.subscriber?.last_name),
       fullName(attributes?.first_name, attributes?.last_name)
     );
-    if (status === "Success") return { status: "success", mpesaReference, payerName };
-    if (status === "Failed") return { status: "failed", mpesaReference, payerName };
+    // KopoKopo status capitalisation can differ between API versions.
+    if (["success", "successful", "completed", "complete"].includes(status ?? "")) {
+      return { status: "success", mpesaReference, payerName };
+    }
+    if (["failed", "failure", "cancelled", "canceled"].includes(status ?? "")) {
+      return { status: "failed", mpesaReference, payerName };
+    }
     if (!status) console.error(`Kopokopo status check got an unrecognized response shape for ${resourceUrl}:`, JSON.stringify(data));
     return { status: "pending", mpesaReference, payerName };
   } catch (err) {
