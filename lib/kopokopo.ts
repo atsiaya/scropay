@@ -17,6 +17,7 @@ async function getAccessToken(): Promise<string> {
 
   const res = await fetch(`${BASE_URL}/oauth/token`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
@@ -50,6 +51,7 @@ export async function initiateStkPush(input: {
   const accessToken = await getAccessToken();
   const res = await fetch(`${BASE_URL}/api/v2/incoming_payments`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -62,14 +64,17 @@ export async function initiateStkPush(input: {
         first_name: "Ramp",
         last_name: "Customer",
         phone_number: input.phoneNumber,
-        ...(input.email ? { email: input.email } : {}),
       },
       amount: { currency: "KES", value: input.amountKes },
-      metadata: { reference: input.reference },
       _links: { callback_url: input.callbackUrl },
     }),
   });
-  if (res.status !== 201) throw new Error(`Kopokopo stk_push_failed (${res.status}): ${await res.text()}`);
+  if (res.status !== 201) {
+    const body = await res.text();
+    console.error(`Kopokopo STK push failed (${res.status}) for ${input.phoneNumber}:`, body);
+    if (res.status === 401) cachedToken = null;
+    throw new Error(`Kopokopo stk_push_failed (${res.status}): ${body}`);
+  }
 
   const resourceUrl = res.headers.get("location");
   if (!resourceUrl) throw new Error("Kopokopo response had no Location header to poll for status.");
@@ -81,6 +86,12 @@ export interface StkPushPaymentResult {
   status: KopokopoPaymentStatus;
   mpesaReference: string | null;
   payerName: string | null;
+  /** Kopokopo's own decline reason, when a "failed" status includes one.
+   *  Field name isn't reliably documented — checks a few plausible paths
+   *  and is null if none match, but the full response is always logged
+   *  on a failed status regardless, so the real field name is visible in
+   *  your function logs even when this comes back null. */
+  reason: string | null;
 }
 
 function stringValue(value: unknown): string | null {
@@ -108,7 +119,7 @@ export async function getStkPushPayment(resourceUrl: string): Promise<StkPushPay
     });
     if (!res.ok) {
       console.error(`Kopokopo status check non-OK (${res.status}) for ${resourceUrl}:`, await res.text().catch(() => "<no body>"));
-      return { status: "pending", mpesaReference: null, payerName: null };
+      return { status: "pending", mpesaReference: null, payerName: null, reason: null };
     }
 
     const data = await res.json().catch(() => null);
@@ -126,18 +137,34 @@ export async function getStkPushPayment(resourceUrl: string): Promise<StkPushPay
       fullName(attributes?.subscriber?.first_name, attributes?.subscriber?.last_name),
       fullName(attributes?.first_name, attributes?.last_name)
     );
+
     // KopoKopo status capitalisation can differ between API versions.
     if (["success", "successful", "completed", "complete"].includes(status ?? "")) {
-      return { status: "success", mpesaReference, payerName };
+      return { status: "success", mpesaReference, payerName, reason: null };
     }
     if (["failed", "failure", "cancelled", "canceled"].includes(status ?? "")) {
-      return { status: "failed", mpesaReference, payerName };
+      // This was previously silent — a "failed" status never got logged
+      // at all, so there was no way to see why. Always log the full body
+      // here: it's the only real way to find Kopokopo's actual field
+      // name for the decline reason in your account/API version, rather
+      // than guessing blind.
+      console.error(`Kopokopo reported ${status} for ${resourceUrl}:`, JSON.stringify(data));
+      const reason = firstString(
+        attributes?.status_reason,
+        attributes?.failure_reason,
+        attributes?.reason,
+        attributes?.event?.errors,
+        attributes?.event?.resource?.status_reason,
+        attributes?.event?.resource?.reason
+      );
+      return { status: "failed", mpesaReference, payerName, reason };
     }
+
     if (!status) console.error(`Kopokopo status check got an unrecognized response shape for ${resourceUrl}:`, JSON.stringify(data));
-    return { status: "pending", mpesaReference, payerName };
+    return { status: "pending", mpesaReference, payerName, reason: null };
   } catch (err) {
     console.error(`Kopokopo status check threw for ${resourceUrl}:`, err);
-    return { status: "pending", mpesaReference: null, payerName: null };
+    return { status: "pending", mpesaReference: null, payerName: null, reason: null };
   }
 }
 
