@@ -14,6 +14,21 @@ function truncate(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+function buildReceiptText(order: BuyOrder | null, orderId: string | null, fiat: number, asset: number, network: string, wallet: string): string {
+  const lines = [
+    "Ramp — Payment Receipt",
+    `Order ID: ${order?.id ?? orderId ?? "—"}`,
+    `Paid: KES ${formatFiat(fiat)}`,
+    `Received: ${formatAsset(asset)} USDT`,
+    `Network: ${network}`,
+    `Wallet: ${wallet}`,
+  ];
+  if (order?.mpesaReference) lines.push(`M-Pesa reference: ${order.mpesaReference}`);
+  if (order?.payerName) lines.push(`Payer: ${order.payerName}`);
+  lines.push(`Date: ${order ? new Date(order.createdAt).toLocaleString() : new Date().toLocaleString()}`);
+  return lines.join("\n");
+}
+
 export default function BuyPayStep() {
   const router = useRouter();
   const params = useSearchParams();
@@ -28,6 +43,8 @@ export default function BuyPayStep() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [paidOrder, setPaidOrder] = useState<BuyOrder | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   async function handlePay() {
     const msisdn = normalizeMsisdn(phone);
@@ -85,6 +102,7 @@ export default function BuyPayStep() {
         if (cancelled) return;
 
         if (order.status === "paid") {
+          setPaidOrder(order);
           setStage("paid");
           return;
         }
@@ -106,16 +124,41 @@ export default function BuyPayStep() {
     };
   }, [stage, orderId]);
 
+  async function handleShareReceipt() {
+    const text = buildReceiptText(paidOrder, orderId, fiat, asset, network, wallet);
+    const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
+    if (nav.share) {
+      try {
+        await nav.share({ title: "Ramp payment receipt", text });
+      } catch {
+        // User cancelled the share sheet — not an error.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareFeedback("Copied to clipboard");
+    } catch {
+      setShareFeedback("Couldn't copy — select the text manually");
+    } finally {
+      setTimeout(() => setShareFeedback(null), 2500);
+    }
+  }
+
+  function handlePrintReceipt() {
+    window.print();
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center bg-[var(--color-paper)] px-4 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-5 flex items-center justify-between text-sm text-[var(--color-ink)]/50">
+        <div className="mb-5 flex items-center justify-between text-sm text-[var(--color-ink)]/50 print:hidden">
           <span>Step 3 of 3</span>
           <span className="font-mono">
             KES {formatFiat(fiat)} → {formatAsset(asset)} USDT
           </span>
         </div>
-        <div className="rounded-2xl border border-[var(--color-line)] bg-white/70 p-5 shadow-[0_1px_0_var(--color-line)]">
+        <div className="rounded-2xl border border-[var(--color-line)] bg-white/70 p-5 shadow-[0_1px_0_var(--color-line)] print:border-0 print:bg-white print:p-0 print:shadow-none">
           {stage === "confirm" && (
             <>
               <h2 className="font-display text-lg font-medium">Confirm and pay</h2>
@@ -192,7 +235,7 @@ export default function BuyPayStep() {
 
           {stage === "paid" && (
             <div className="text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-moss)]/10 text-[var(--color-moss-deep)]">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--color-moss)]/10 text-[var(--color-moss-deep)] print:hidden">
                 ✓
               </div>
               <h2 className="font-display text-xl font-medium">Payment received</h2>
@@ -205,9 +248,61 @@ export default function BuyPayStep() {
                   ? "We've sent a receipt to your email."
                   : "Keep the reference below for support."}
               </p>
-              <p className="mt-4 font-mono text-xs text-[var(--color-ink)]/40">
-                Reference: {orderId}
-              </p>
+
+              <div className="mt-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-paper)] p-4 text-left font-mono text-xs text-[var(--color-ink)]/70 print:border-0 print:bg-white print:p-0">
+                <div className="flex justify-between py-0.5">
+                  <span>Order ID</span>
+                  <span>{paidOrder?.id ?? orderId}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Paid</span>
+                  <span>KES {formatFiat(fiat)}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Received</span>
+                  <span>{formatAsset(asset)} USDT</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Network</span>
+                  <span>{network}</span>
+                </div>
+                <div className="flex justify-between py-0.5">
+                  <span>Wallet</span>
+                  <span>{truncate(wallet)}</span>
+                </div>
+                {paidOrder?.mpesaReference && (
+                  <div className="flex justify-between py-0.5">
+                    <span>M-Pesa ref</span>
+                    <span>{paidOrder.mpesaReference}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 print:hidden">
+                <button
+                  onClick={handleShareReceipt}
+                  className="focus-ring rounded-xl border border-[var(--color-line)] bg-white py-2.5 text-sm font-medium text-[var(--color-ink)] hover:border-[var(--color-moss)]"
+                >
+                  Share receipt
+                </button>
+                <button
+                  onClick={handlePrintReceipt}
+                  className="focus-ring rounded-xl border border-[var(--color-line)] bg-white py-2.5 text-sm font-medium text-[var(--color-ink)] hover:border-[var(--color-moss)]"
+                >
+                  Print to PDF
+                </button>
+              </div>
+
+              {shareFeedback && (
+                <p className="mt-2 text-xs text-[var(--color-moss-deep)] print:hidden">{shareFeedback}</p>
+              )}
+
+              <button
+                onClick={() => router.push("/")}
+                className="focus-ring mt-3 w-full rounded-xl bg-[var(--color-ink)] py-3 text-sm font-semibold text-[var(--color-paper)] print:hidden"
+              >
+                Back to ramp
+              </button>
             </div>
           )}
 
