@@ -10,8 +10,8 @@ export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
 
   const amount = `${formatAmountToTwoDecimals(order.assetAmount)} ${order.asset}`;
   const fiatAmount = `KES ${formatAmountToTwoDecimals(order.fiatAmount)}`;
-  const mpesaReference = order.mpesaReference ?? "Not supplied by KopoKopo";
-  const payerName = order.payerName ?? "Not supplied by KopoKopo";
+  const mpesaReference = order.mpesaReference ?? "Not exposed";
+  const payerName = order.payerName ?? "Not exposed";
 
   const adminEmail = sendAdminNotification(
     `Transfer request - ${amount} to ${order.walletAddress}`,
@@ -62,7 +62,7 @@ export async function notifyBuyOrderFailed(order: BuyOrder): Promise<void> {
 
   const amount = `${formatAmountToTwoDecimals(order.assetAmount)} ${order.asset}`;
   const fiatAmount = `KES ${formatAmountToTwoDecimals(order.fiatAmount)}`;
-  const reason = order.failureReason ?? "Not provided by KopoKopo — check the KopoKopo dashboard";
+  const reason = order.failureReason ?? "Transaction not succesful";
 
   const adminEmail = sendAdminNotification(
     `Payment failed - ${fiatAmount} (no action needed)`,
