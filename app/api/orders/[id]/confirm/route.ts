@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { markAwaitingVerification, finalizeSellOrderClaim } from "@/lib/orders";
+import { getSellOrder, markAwaitingVerification, finalizeSellOrderClaim } from "@/lib/orders";
 
 /**
  * "I have already paid" hits this. It does NOT verify anything on-chain —
@@ -16,16 +16,23 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const order = markAwaitingVerification(id);
-  if (!order) {
-    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+  const claimed = markAwaitingVerification(id);
+  if (claimed) {
+    // This request is the one that actually made the transition — log
+    // + notify exactly once.
+    await finalizeSellOrderClaim(claimed);
+    return NextResponse.json(claimed);
   }
 
-  // Logs to Firestore, notifies you, and emails the customer if they gave
-  // one — same treatment as lib/buy-orders.ts's finalizeBuyOrder, just
-  // named differently since this is a claim awaiting verification, not a
-  // confirmed final outcome. See its own comments for the distinction.
-  await finalizeSellOrderClaim(order);
-
-  return NextResponse.json(order);
+  // markAwaitingVerification returns undefined for two different
+  // reasons — a genuinely missing order, or one that's already past
+  // pending_deposit (a double click, a retried request). Those need
+  // different responses: the first is a real error, the second should
+  // look like success to the client, just without re-notifying anyone.
+  const existing = getSellOrder(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  }
+  return NextResponse.json(existing);
 }

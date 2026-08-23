@@ -60,38 +60,54 @@ export function getSellOrder(id: string): SellOrder | undefined {
   return order;
 }
 
+/**
+ * Only flips pending_deposit -> awaiting_verification, and only returns
+ * the order when THIS call is the one that made that transition. A
+ * second call for an order that's already past pending_deposit (a
+ * double "I have already paid" click, a retried request after a slow
+ * response) returns undefined here — same idempotency shape as
+ * lib/buy-orders.ts's markBuyOrderPaid/markBuyOrderFailed. The route
+ * handler is what decides what a "no-op, already handled" response
+ * looks like to the client — this function's job is just to guarantee
+ * finalizeSellOrderClaim only ever runs once per order.
+ */
 export function markAwaitingVerification(id: string): SellOrder | undefined {
   const order = orders.get(id);
-  if (!order) return undefined;
-  if (order.status === "pending_deposit") {
-    order.status = "awaiting_verification";
-  }
+  if (!order || order.status !== "pending_deposit") return undefined;
+  order.status = "awaiting_verification";
   return order;
 }
 
 /**
- * Same shape as lib/buy-orders.ts's finalizeBuyOrder: log the full order
- * to Firestore, notify you, and email the customer if they gave one —
- * called once, right when "I have already paid" flips the order to
- * awaiting_verification. Sell doesn't have a clean paid/failed binary
- * the way Kopokopo gives buy orders — this is a claim, not a confirmed
- * outcome — so the copy below is written as "we're checking," not "it's
- * done." If you build the on-chain watcher described in the deposit
- * step's comments, that's the point to call this again (or a sibling
- * function) once the deposit is actually confirmed on-chain.
+ * Same shape as lib/buy-orders.ts's notifyBuyOrderPaid/Failed: log the
+ * full order to Firestore, notify you, and email the customer if they
+ * gave one — called once, right when "I have already paid" flips the
+ * order to awaiting_verification. Sell doesn't have a clean paid/failed
+ * binary the way Kopokopo gives buy orders — this is a claim, not a
+ * confirmed outcome — so the admin email is framed as a conditional
+ * action ("once you've verified the deposit, pay out") rather than an
+ * immediate instruction, since paying out before confirming the USDT
+ * actually arrived is the exact mistake this wording is meant to avoid.
+ * If you build the on-chain watcher described in the deposit step's
+ * comments, that's the point to add a real "confirmed" outcome and a
+ * sibling function that fires once that's automatic instead of manual.
  */
 export async function finalizeSellOrderClaim(order: SellOrder): Promise<void> {
   await logTransaction(order);
 
-  await sendOwnerNotification(
-    `Sell order awaiting verification — ${formatAsset(order.assetAmount)} USDT`,
+  const assetAmount = `${formatAsset(order.assetAmount)} ${order.asset}`;
+  const fiatAmount = `KES ${formatFiat(order.fiatAmount)}`;
+
+  const adminEmail = sendOwnerNotification(
+    `Verify deposit, then pay out - ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}`,
     renderDetailsTable([
       ["Order ID", order.id],
-      ["Status", "Awaiting verification"],
-      ["Asset sent (claimed)", `${formatAsset(order.assetAmount)} ${order.asset}`],
+      ["Status", "Awaiting verification — do not pay out yet"],
+      ["Action", `Check ${order.depositAddress} on ${order.network} for ${assetAmount}. Once confirmed, send ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}.`],
+      ["Asset claimed sent", assetAmount],
       ["Network", order.network],
       ["Deposit address", order.depositAddress],
-      ["Payout amount", `KES ${formatFiat(order.fiatAmount)}`],
+      ["Payout amount", fiatAmount],
       ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
       ["Email", order.email ?? "—"],
       ["Created", new Date(order.createdAt).toLocaleString()],
@@ -99,18 +115,20 @@ export async function finalizeSellOrderClaim(order: SellOrder): Promise<void> {
     ])
   );
 
-  if (order.email) {
-    await sendCustomerNotification(
-      order.email,
-      "We're verifying your USDT sale",
-      `<p>We've received your confirmation that you sent USDT — we're checking for it now.</p>
-       ${renderDetailsTable([
-         ["Order ID", order.id],
-         ["Amount", `${formatAsset(order.assetAmount)} ${order.asset} (${order.network})`],
-         ["You'll receive", `KES ${formatFiat(order.fiatAmount)}`],
-         ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
-       ])}
-       <p>Once confirmed, we'll send the KES above to that M-Pesa number.</p>`
-    );
-  }
+  const customerEmail = order.email
+    ? sendCustomerNotification(
+        order.email,
+        "We're verifying your USDT sale",
+        renderDetailsTable([
+          ["Status", "We're checking for your USDT — this isn't instant"],
+          ["Amount", assetAmount],
+          ["Network", order.network],
+          ["You'll receive", fiatAmount],
+          ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
+          ["Order ID", order.id],
+        ])
+      )
+    : Promise.resolve();
+
+  await Promise.all([adminEmail, customerEmail]);
 }

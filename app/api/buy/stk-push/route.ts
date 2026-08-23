@@ -3,9 +3,10 @@ import {
   attachKopokopoResource,
   createBuyOrder,
   getBuyOrder,
+  markBuyOrderFailed,
   markBuyOrderPaid,
+  notifyBuyOrderFailed,
   notifyBuyOrderPaid,
-  setBuyOrderStatus,
 } from "@/lib/buy-orders";
 import { getStkPushPayment, initiateStkPush } from "@/lib/kopokopo";
 import { MIN_BUY_FIAT_KES } from "@/lib/limits";
@@ -63,10 +64,18 @@ export async function GET(req: NextRequest) {
   if (order.status === "pending_payment" && order.kopokopoResourceUrl) {
     const payment = await getStkPushPayment(order.kopokopoResourceUrl);
     if (payment.status === "success") {
+      // markBuyOrderPaid only flips status if it's still pending_payment,
+      // so a concurrent poll (or this endpoint racing the webhook) can
+      // never trigger notifyBuyOrderPaid twice for the same order.
       const updated = markBuyOrderPaid(order.id, payment);
       if (updated) await notifyBuyOrderPaid(updated);
     } else if (payment.status === "failed") {
-      setBuyOrderStatus(order.id, "failed");
+      // Same idempotency guard as the paid path — this was previously
+      // setBuyOrderStatus (no guard, no notify call at all), which is
+      // why failed orders never emailed anyone and always showed
+      // failureReason: null regardless of what KopoKopo actually said.
+      const updated = markBuyOrderFailed(order.id, payment.reason);
+      if (updated) await notifyBuyOrderFailed(updated);
     }
   }
   return NextResponse.json(getBuyOrder(orderId));

@@ -48,6 +48,53 @@ export async function notifyBuyOrderPaid(order: BuyOrder): Promise<void> {
   await Promise.all([adminEmail, customerEmail]);
 }
 
+/**
+ * Mirrors notifyBuyOrderPaid for the other outcome. No money moved, so
+ * the admin email is informational (nothing to action) rather than a
+ * transfer request, and the customer email is reassurance — no charge
+ * was made — rather than a receipt. Also logs to Firestore: a failed
+ * attempt is just as worth having a record of as a successful one, for
+ * spotting patterns (a cluster of failures usually means an account/till
+ * problem, not a string of unlucky customers).
+ */
+export async function notifyBuyOrderFailed(order: BuyOrder): Promise<void> {
+  await logTransaction(order);
+
+  const amount = `${formatAmountToTwoDecimals(order.assetAmount)} ${order.asset}`;
+  const fiatAmount = `KES ${formatAmountToTwoDecimals(order.fiatAmount)}`;
+  const reason = order.failureReason ?? "Not provided by KopoKopo — check the KopoKopo dashboard";
+
+  const adminEmail = sendAdminNotification(
+    `Payment failed - ${fiatAmount} (no action needed)`,
+    renderDetailsTable([
+      ["Order ID", order.id],
+      ["Status", "M-Pesa payment failed - no funds received"],
+      ["Reason (from KopoKopo)", reason],
+      ["Fiat amount", fiatAmount],
+      ["USDT amount (not sent)", amount],
+      ["Destination wallet", order.walletAddress],
+      ["Network", order.network],
+      ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
+      ["Created", new Date(order.createdAt).toLocaleString()],
+    ])
+  );
+
+  const customerEmail = order.email
+    ? sendCustomerNotification(
+        order.email,
+        "Your payment didn't go through",
+        renderDetailsTable([
+          ["Status", "Payment failed - no charge was made"],
+          ["Amount", fiatAmount],
+          ["Reason", reason],
+          ["Order ID", order.id],
+        ])
+      )
+    : Promise.resolve();
+
+  await Promise.all([adminEmail, customerEmail]);
+}
+
 const buyOrders = new Map<string, BuyOrder>();
 const ORDER_TTL_MS = 15 * 60 * 1000;
 
@@ -121,6 +168,18 @@ export function markBuyOrderPaid(
   order.status = "paid";
   order.mpesaReference = payment.mpesaReference;
   order.payerName = payment.payerName;
+  return order;
+}
+
+/** Marks an order failed exactly once, preventing duplicate webhook/poll emails. */
+export function markBuyOrderFailed(
+  id: string,
+  failureReason: string | null
+): BuyOrder | undefined {
+  const order = buyOrders.get(id);
+  if (!order || order.status !== "pending_payment") return undefined;
+  order.status = "failed";
+  order.failureReason = failureReason;
   return order;
 }
 
