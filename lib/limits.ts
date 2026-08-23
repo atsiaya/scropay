@@ -6,7 +6,7 @@
  * against the caller's verification level) before this ever touches real
  * money. A client-side check alone is trivially bypassable.
  */
-export const MIN_BUY_FIAT_KES = 1;
+export const MIN_BUY_FIAT_KES = 10;
 export const MAX_BUY_FIAT_KES = 500;
 
 export const MIN_SELL_ASSET_USDT = 2;
