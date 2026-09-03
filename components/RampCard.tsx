@@ -19,8 +19,6 @@ import LedgerStrip from "./LedgerStrip";
 // can't actually complete.
 const NETWORK_OPTIONS: { value: Network; label: string }[] = [
   { value: "CELO", label: "Celo" },
-  { value: "POLYGON", label: "Polygon" },
-  { value: "BASE", label: "Base" },
 ];
 
 export default function RampCard() {
