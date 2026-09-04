@@ -61,6 +61,12 @@ export interface SellOrder {
   email: string | null;
   depositAddress: string;
   status: OrderStatus;
+  /** the agent responsible for receiving this deposit and paying out —
+   *  null when the network fell back to the static treasury address
+   *  instead of an agent match (see lib/orders.ts's createSellOrder) */
+  assignedAgentId: string | null;
+  assignedAgentName: string | null;
+  assignedAgentEmail: string | null;
   createdAt: number;
   expiresAt: number;
 }
@@ -92,4 +98,28 @@ export interface BuyOrder {
   failureReason: string | null;
   createdAt: number;
   expiresAt: number;
+}
+
+/**
+ * A P2P merchant, not a ramp customer — signs in via /agent/sign-in,
+ * receives USDT on their own Celo address, and pays out KES to sell-flow
+ * customers assigned to them. Stored in Firestore's `agents` collection,
+ * doc id = Firebase Auth uid.
+ *
+ * fullName/idNumber are self-reported at profile-completion time — there
+ * is no independent verification of an agent's identity (unlike ramp
+ * customers, who go through Didit). Worth knowing before treating
+ * `idNumber` as a verified KYC field anywhere downstream.
+ */
+export interface AgentProfile {
+  uid: string;
+  email: string;
+  fullName: string | null;
+  celoAddress: string | null;
+  idNumber: string | null;
+  online: boolean;
+  lastOnlineAt: number | null;
+  /** last time a sell order was routed to this agent — used to spread
+   *  assignments across online agents (see lib/agents.ts's findAvailableAgent) */
+  lastAssignedAt: number | null;
 }
