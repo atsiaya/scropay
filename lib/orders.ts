@@ -1,4 +1,7 @@
+import { getFirestore } from "firebase-admin/firestore";
 import { SellOrder, Network } from "./types";
+import { getAdminAuth } from "./firebase-admin";
+import { findAvailableAgent } from "./agents";
 import { getTreasuryAddress } from "./treasury";
 import { logTransaction } from "./firebase";
 import { sendOwnerNotification, sendCustomerNotification, renderDetailsTable } from "./email";
@@ -6,32 +9,55 @@ import { formatAsset, formatFiat } from "./format";
 import { formatMsisdn } from "./phone";
 
 /**
- * A Map on a module-level variable. This works for local dev and for a
- * single warm serverless instance, but Vercel can and will route
- * consecutive requests to different instances — so this will lose orders
- * unpredictably in production. Before this handles real money, swap this
- * for a real store: Vercel KV / Upstash Redis (fast, simple, a good fit
- * for "pending order, short TTL") or a Postgres table if you also want it
- * queryable for reconciliation later. The function signatures below are
- * the whole surface area you'd need to keep — swap the implementation,
- * not the callers.
+ * Sell orders live in Firestore now, not an in-memory Map — a real
+ * requirement, not a nice-to-have, once the agent dashboard needs to
+ * query "orders assigned to me" from a completely different request
+ * than the one that created the order. An in-memory Map on one
+ * serverless instance is invisible to every other instance; Firestore is
+ * the one thing every request can actually see.
  */
-const orders = new Map<string, SellOrder>();
-
+const COLLECTION = "sellOrders";
 const ORDER_TTL_MS = 15 * 60 * 1000; // 15 minutes to complete the deposit
+
+function ensureInit(): void {
+  getAdminAuth();
+}
 
 function generateOrderId(): string {
   return `ord_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createSellOrder(input: {
+export async function createSellOrder(input: {
   asset: string;
   network: Network;
   assetAmount: number;
   fiatAmount: number;
   mpesaNumber: string;
   email: string | null;
-}): SellOrder {
+}): Promise<SellOrder | { error: "no_agents_available" }> {
+  ensureInit();
+
+  let depositAddress: string;
+  let assignedAgentId: string | null = null;
+  let assignedAgentName: string | null = null;
+  let assignedAgentEmail: string | null = null;
+
+  // Only Celo has agent-sourced liquidity right now — agent profiles
+  // only collect a Celo receiving address. Every other network still
+  // falls back to the static treasury address instead of an agent
+  // match; extend AgentProfile with per-network addresses if you want
+  // agents to cover Polygon/Base too.
+  if (input.network === "CELO") {
+    const agent = await findAvailableAgent();
+    if (!agent) return { error: "no_agents_available" };
+    depositAddress = agent.celoAddress;
+    assignedAgentId = agent.uid;
+    assignedAgentName = agent.fullName;
+    assignedAgentEmail = agent.email;
+  } else {
+    depositAddress = getTreasuryAddress(input.network);
+  }
+
   const now = Date.now();
   const order: SellOrder = {
     id: generateOrderId(),
@@ -42,78 +68,156 @@ export function createSellOrder(input: {
     fiatAmount: input.fiatAmount,
     mpesaNumber: input.mpesaNumber,
     email: input.email,
-    depositAddress: getTreasuryAddress(input.network),
+    depositAddress,
+    assignedAgentId,
+    assignedAgentName,
+    assignedAgentEmail,
     status: "pending_deposit",
     createdAt: now,
     expiresAt: now + ORDER_TTL_MS,
   };
-  orders.set(order.id, order);
+
+  await getFirestore().collection(COLLECTION).doc(order.id).set(order);
   return order;
 }
 
-export function getSellOrder(id: string): SellOrder | undefined {
-  const order = orders.get(id);
-  if (!order) return undefined;
+export async function getSellOrder(id: string): Promise<SellOrder | undefined> {
+  ensureInit();
+  const ref = getFirestore().collection(COLLECTION).doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) return undefined;
+
+  const order = doc.data() as SellOrder;
   if (order.status === "pending_deposit" && Date.now() > order.expiresAt) {
     order.status = "expired";
+    await ref.set({ status: "expired" }, { merge: true });
   }
   return order;
 }
 
 /**
  * Only flips pending_deposit -> awaiting_verification, and only returns
- * the order when THIS call is the one that made that transition. A
- * second call for an order that's already past pending_deposit (a
- * double "I have already paid" click, a retried request after a slow
- * response) returns undefined here — same idempotency shape as
- * lib/buy-orders.ts's markBuyOrderPaid/markBuyOrderFailed. The route
- * handler is what decides what a "no-op, already handled" response
- * looks like to the client — this function's job is just to guarantee
- * finalizeSellOrderClaim only ever runs once per order.
+ * the order when THIS call is the one that made that transition — same
+ * idempotency shape as lib/buy-orders.ts's markBuyOrderPaid: a second
+ * call for an order that's already past pending_deposit (a double "I
+ * have already paid" click) returns undefined, so finalizeSellOrderClaim
+ * below only ever runs once per order.
  */
-export function markAwaitingVerification(id: string): SellOrder | undefined {
-  const order = orders.get(id);
-  if (!order || order.status !== "pending_deposit") return undefined;
-  order.status = "awaiting_verification";
-  return order;
+export async function markAwaitingVerification(id: string): Promise<SellOrder | undefined> {
+  ensureInit();
+  const ref = getFirestore().collection(COLLECTION).doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) return undefined;
+
+  const order = doc.data() as SellOrder;
+  if (order.status !== "pending_deposit") return undefined;
+
+  await ref.set({ status: "awaiting_verification" }, { merge: true });
+  return { ...order, status: "awaiting_verification" };
 }
 
 /**
- * Same shape as lib/buy-orders.ts's notifyBuyOrderPaid/Failed: log the
- * full order to Firestore, notify you, and email the customer if they
- * gave one — called once, right when "I have already paid" flips the
- * order to awaiting_verification. Sell doesn't have a clean paid/failed
- * binary the way Kopokopo gives buy orders — this is a claim, not a
- * confirmed outcome — so the admin email is framed as a conditional
- * action ("once you've verified the deposit, pay out") rather than an
- * immediate instruction, since paying out before confirming the USDT
- * actually arrived is the exact mistake this wording is meant to avoid.
- * If you build the on-chain watcher described in the deposit step's
- * comments, that's the point to add a real "confirmed" outcome and a
- * sibling function that fires once that's automatic instead of manual.
+ * Called by the assigned agent from their dashboard once they've
+ * verified the USDT arrived at their own Celo address and sent the
+ * M-Pesa payout. Same trust model as before this feature existed — just
+ * attributed to a specific person now instead of "the admin"
+ * generically. There's still no automated on-chain check behind this
+ * click; that's the same unbuilt gap noted throughout this project's
+ * comments, just narrower in scope now (one agent's word, not
+ * anyone's).
+ */
+export async function markOrderPaidByAgent(
+  id: string,
+  agentUid: string
+): Promise<SellOrder | { error: "not_found" | "not_assigned_to_you" | "already_final" }> {
+  ensureInit();
+  const ref = getFirestore().collection(COLLECTION).doc(id);
+  const doc = await ref.get();
+  if (!doc.exists) return { error: "not_found" };
+
+  const order = doc.data() as SellOrder;
+  if (order.assignedAgentId !== agentUid) return { error: "not_assigned_to_you" };
+  if (order.status === "confirmed") return { error: "already_final" };
+
+  const updated: SellOrder = { ...order, status: "confirmed" };
+  await ref.set({ status: "confirmed" }, { merge: true });
+  await logTransaction(updated);
+
+  if (updated.email) {
+    await sendCustomerNotification(
+      updated.email,
+      "Your KES payout is on its way",
+      renderDetailsTable([
+        ["Order ID", updated.id],
+        ["Amount", `KES ${formatFiat(updated.fiatAmount)}`],
+        ["M-Pesa number", formatMsisdn(updated.mpesaNumber)],
+      ])
+    );
+  }
+
+  return updated;
+}
+
+/**
+ * All orders currently assigned to this agent, most recent first. This
+ * query needs a Firestore composite index (assignedAgentId ==, orderBy
+ * createdAt) — the first time it actually runs, Firestore will throw an
+ * error containing a direct link to create that index in the console.
+ * It only needs creating once per project, not per deploy.
+ */
+export async function getAgentSellOrders(agentUid: string): Promise<SellOrder[]> {
+  ensureInit();
+  const snapshot = await getFirestore()
+    .collection(COLLECTION)
+    .where("assignedAgentId", "==", agentUid)
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .get();
+  return snapshot.docs.map((d) => d.data() as SellOrder);
+}
+
+/**
+ * Logs to Firestore, notifies the platform admin (oversight) AND the
+ * specific assigned agent (who's actually responsible for acting on
+ * this one) — different audiences, both worth reaching. Sell doesn't
+ * have a clean paid/failed binary the way Kopokopo gives buy orders —
+ * this is a claim, not a confirmed outcome — so every message here is
+ * framed as "go verify, then act," not "it's done."
  */
 export async function finalizeSellOrderClaim(order: SellOrder): Promise<void> {
-  await logTransaction(order);
-
   const assetAmount = `${formatAsset(order.assetAmount)} ${order.asset}`;
   const fiatAmount = `KES ${formatFiat(order.fiatAmount)}`;
+  const actionLine = order.assignedAgentId
+    ? `Check ${order.depositAddress} on ${order.network} for ${assetAmount}. Once confirmed, send ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}, then mark it paid from your dashboard.`
+    : `Check ${order.depositAddress} on ${order.network} for ${assetAmount}. Once confirmed, send ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}.`;
+
+  const rows: [string, string][] = [
+    ["Order ID", order.id],
+    ["Status", "Awaiting verification — do not pay out yet"],
+    ["Action", actionLine],
+    ["Asset claimed sent", assetAmount],
+    ["Network", order.network],
+    ["Deposit address", order.depositAddress],
+    ["Payout amount", fiatAmount],
+    ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
+    ["Assigned agent", order.assignedAgentName ?? "— (treasury address, not agent-sourced)"],
+    ["Email", order.email ?? "—"],
+    ["Created", new Date(order.createdAt).toLocaleString()],
+    ["Expires", new Date(order.expiresAt).toLocaleString()],
+  ];
 
   const adminEmail = sendOwnerNotification(
-    `Verify deposit, then pay out - ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}`,
-    renderDetailsTable([
-      ["Order ID", order.id],
-      ["Status", "Awaiting verification — do not pay out yet"],
-      ["Action", `Check ${order.depositAddress} on ${order.network} for ${assetAmount}. Once confirmed, send ${fiatAmount} to ${formatMsisdn(order.mpesaNumber)}.`],
-      ["Asset claimed sent", assetAmount],
-      ["Network", order.network],
-      ["Deposit address", order.depositAddress],
-      ["Payout amount", fiatAmount],
-      ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
-      ["Email", order.email ?? "—"],
-      ["Created", new Date(order.createdAt).toLocaleString()],
-      ["Expires", new Date(order.expiresAt).toLocaleString()],
-    ])
+    `Sell order awaiting verification — ${fiatAmount} via ${order.assignedAgentName ?? "treasury"}`,
+    renderDetailsTable(rows)
   );
+
+  const agentEmail = order.assignedAgentEmail
+    ? sendCustomerNotification(
+        order.assignedAgentEmail,
+        `Verify deposit, then pay out - ${fiatAmount}`,
+        renderDetailsTable(rows)
+      )
+    : Promise.resolve();
 
   const customerEmail = order.email
     ? sendCustomerNotification(
@@ -126,9 +230,10 @@ export async function finalizeSellOrderClaim(order: SellOrder): Promise<void> {
           ["You'll receive", fiatAmount],
           ["M-Pesa number", formatMsisdn(order.mpesaNumber)],
           ["Order ID", order.id],
+          ["Processed by", order.assignedAgentName ?? "our team"],
         ])
       )
     : Promise.resolve();
 
-  await Promise.all([adminEmail, customerEmail]);
+  await Promise.all([adminEmail, agentEmail, customerEmail]);
 }
