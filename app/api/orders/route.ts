@@ -4,6 +4,8 @@ import { normalizeMsisdn } from "@/lib/phone";
 import { Network } from "@/lib/types";
 import { MIN_SELL_ASSET_USDT, MAX_SELL_ASSET_USDT } from "@/lib/limits";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
   if (!body) {
@@ -19,9 +21,6 @@ export async function POST(req: NextRequest) {
     email?: string;
   };
 
-  // Re-check everything server-side — the limits and phone format in the
-  // UI are for a good experience, not enforcement. Never trust a client
-  // to have actually respected them.
   const msisdn = normalizeMsisdn(mpesaNumber ?? "");
   if (!msisdn) {
     return NextResponse.json(
@@ -43,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing order fields" }, { status: 400 });
   }
 
-  const order = createSellOrder({
+  const result = await createSellOrder({
     asset,
     network,
     assetAmount,
@@ -52,7 +51,16 @@ export async function POST(req: NextRequest) {
     email: email?.trim() || null,
   });
 
-  return NextResponse.json(order, { status: 201 });
+  if ("error" in result) {
+    // 503: not the customer's fault, and retrying shortly might work —
+    // an agent could come online any minute.
+    return NextResponse.json(
+      { error: "No agents are online right now — try again shortly." },
+      { status: 503 }
+    );
+  }
+
+  return NextResponse.json(result, { status: 201 });
 }
 
 export async function GET(req: NextRequest) {
@@ -60,7 +68,7 @@ export async function GET(req: NextRequest) {
   if (!id) {
     return NextResponse.json({ error: "Missing id" }, { status: 400 });
   }
-  const order = getSellOrder(id);
+  const order = await getSellOrder(id);
   if (!order) {
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
