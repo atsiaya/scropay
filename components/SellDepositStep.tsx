@@ -37,9 +37,6 @@ export default function SellDepositStep() {
   }, [orderId]);
 
   useEffect(() => {
-    // Fetching on mount/param-change, not deriving from other state — the
-    // lint rule can't tell loadOrder is a stable async fetch, not a loop risk.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadOrder();
   }, [loadOrder]);
 
@@ -50,19 +47,11 @@ export default function SellDepositStep() {
       .catch(() => setQrDataUrl(null));
   }, [order]);
 
-  useEffect(() => {
-    if (order?.status !== "awaiting_verification") return;
-    const timeout = setTimeout(() => router.push("/"), 10_000);
-    return () => clearTimeout(timeout);
-  }, [order?.status, router]);
-
   async function handleAlreadyPaid() {
     if (!order) return;
     setConfirming(true);
     try {
-      const res = await fetch(`/api/orders/${order.id}/confirm`, {
-        method: "POST",
-      });
+      const res = await fetch(`/api/orders/${order.id}/confirm`, { method: "POST" });
       if (res.ok) setOrder(await res.json());
     } finally {
       setConfirming(false);
@@ -103,8 +92,8 @@ export default function SellDepositStep() {
     return (
       <Shell step="Step 3 of 3">
         <p className="text-sm text-[#8a3b2b]">
-          This order expired before a deposit was confirmed. Start a new one
-          — amounts are locked in for 15 minutes at a time.
+          This order expired before a deposit was confirmed. Start a new
+          one — amounts are locked in for 15 minutes at a time.
         </p>
         <button
           onClick={() => router.push("/")}
@@ -116,7 +105,8 @@ export default function SellDepositStep() {
     );
   }
 
-  if (order.status === "awaiting_verification") {
+  if (order.status === "awaiting_verification" || order.status === "confirmed") {
+    const done = order.status === "confirmed";
     return (
       <Shell step="Step 3 of 3">
         <div className="text-center">
@@ -124,18 +114,15 @@ export default function SellDepositStep() {
             ✓
           </div>
           <h2 className="font-display text-xl font-medium">
-            Verifying your transfer
+            {done ? "Payment sent" : "Verifying your transfer"}
           </h2>
           <p className="mt-2 text-sm text-[var(--color-ink)]/60">
-            Once we see {formatAsset(order.assetAmount)} USDT land, we&apos;ll
-            send KES {formatFiat(order.fiatAmount)} to{" "}
-            {formatMsisdn(order.mpesaNumber)}.
+            {done
+              ? `KES ${formatFiat(order.fiatAmount)} has been sent to ${formatMsisdn(order.mpesaNumber)}.`
+              : `Once we see ${formatAsset(order.assetAmount)} USDT land, ${order.assignedAgentName ?? "we"} will send KES ${formatFiat(order.fiatAmount)} to ${formatMsisdn(order.mpesaNumber)}.`}
           </p>
           <p className="mt-4 font-mono text-xs text-[var(--color-ink)]/40">
             Reference: {order.id}
-          </p>
-          <p className="mt-2 text-xs text-[var(--color-ink)]/40">
-            Returning home in 10 seconds.
           </p>
         </div>
       </Shell>
@@ -153,6 +140,13 @@ export default function SellDepositStep() {
         </span>{" "}
         on {order.network} to the address below.
       </p>
+
+      {order.assignedAgentName && (
+        <div className="mt-3 rounded-xl border border-[var(--color-moss)]/30 bg-[var(--color-moss)]/5 px-3 py-2 text-sm text-[var(--color-moss-deep)]">
+          Your payment will be processed by{" "}
+          <span className="font-medium">{order.assignedAgentName}</span>.
+        </div>
+      )}
 
       <div className="mt-4 flex flex-col items-center">
         {qrDataUrl ? (
