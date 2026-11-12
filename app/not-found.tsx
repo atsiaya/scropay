@@ -18,9 +18,8 @@ export default function NotFound() {
           <p className="mt-2 text-sm text-[var(--color-ink)]/60">
             We sent an STK push to this URL and got no response. No page was found — and, unlike last time, no charge was made either.
           </p>
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-6 grid gap-3">
             <Link href="/" className="focus-ring rounded-xl bg-[var(--color-moss)] py-3 text-sm font-semibold text-[var(--color-accent-ink)]">Back to Ramp</Link>
-            <Link href="/support" className="focus-ring rounded-xl border border-[var(--color-line)] py-3 text-sm font-semibold hover:bg-[var(--color-ink)]/5">Get help</Link>
           </div>
         </div>
       </div>
