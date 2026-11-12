@@ -1,6 +1,5 @@
 import Link from "next/link";
 import RampCard from "@/components/RampCard";
-import { MIN_BUY_FIAT_KES } from "@/lib/limits";
 
 const STEPS = [
   { n: "01", t: "Enter an amount", d: "See the exact USDT you'll get before you commit. The rate you see is the rate you pay." },
@@ -41,7 +40,7 @@ export default function Home() {
             </Link>
           </div>
           <dl className="mt-10 grid max-w-lg grid-cols-3 gap-4 border-t border-[var(--color-line)] pt-6">
-            {[["3", "networks"], ["20s", "rate refresh"], [`KES ${MIN_BUY_FIAT_KES}`, "minimum buy"]].map(([v, l]) => (
+            {[["3", "networks"], ["20s", "rate refresh"], ["KES 100", "minimum buy"]].map(([v, l]) => (
               <div key={l}>
                 <dt className="font-mono text-xl font-medium text-[var(--color-ink)]">{v}</dt>
                 <dd className="text-xs text-[var(--color-ink)]/45">{l}</dd>
